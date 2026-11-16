@@ -269,6 +269,9 @@ class WillItRun(unittest.TestCase):
         self.assertEqual(robots.firmware_version(["Version: 1.8.1.2"]), "1.8.1.2")
         self.assertEqual(robots.firmware_version(["Booster K1"]), "")
         self.assertEqual(robots.firmware_version(["Booster K1", "Model Version: 1.0.1"]), "")   # not the firmware
+        # the last entry of /opt/booster/version.txt wins over robot_info.txt
+        self.assertEqual(robots.firmware_version(["firmware 1.7.1"], "1.8.1.2-release-02884-2026-10-15-global"), "1.8.1.2")
+        self.assertEqual(robots.firmware_version([], "v1.4.1.0-release"), "1.4.1.0")
 
     def test_the_status_file_is_looked_for_where_the_software_writes_it(self):
         # InternalStateProvider.cpp, DeployDialog.cpp and bh status must agree on the places.

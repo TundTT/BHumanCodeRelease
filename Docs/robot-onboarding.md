@@ -69,7 +69,7 @@ properly`). A robot can have everything installed and still not run; these are t
 | `~/logs` or `~/Config` not writable / missing | the software cannot write its logs or configuration |
 | `camera stream is stuck in a loop` | the newest log is full of `[cam_stream_receiver] unexpected calib size X (expected 490) - resyncing`. The receiver on the Orin (`Util/X5Camera/include/cam_stream_receiver.cpp`) expects a calibration packet of exactly 490 bytes and the program on the X5 camera board sent another size; there is no version field, so both sides must come from the same version (`update_x5` installs the matching camera stack). Without a calibration there are no images |
 | a line repeats hundreds of times in the log | something fails in a loop; the line is shown |
-| firmware other than 1.7.1 | not tested with this code (1.8.0 is known to misbehave) |
+| firmware other than 1.7.1 | not tested with this code (1.8.0 is known to misbehave). The scan reads the version from the last `Version:` entry of `/opt/booster/version.txt` (the list of every firmware the robot had); `Model Version` in `robot_info.txt` is the robot model, not the firmware |
 | `sudo -n /bin/systemctl` not allowed | `bh reboot`, `bh shutdown` and the installer need it |
 
 The scan only reads; it changes nothing on the robot.

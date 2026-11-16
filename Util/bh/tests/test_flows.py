@@ -153,7 +153,7 @@ class Flows(unittest.TestCase):
         out = self.fails("robot", "scan", "Alice")
         self.assertIn("Will it run?", out)
         self.assertIn("status file can be written (/run/user/1000)", out)
-        self.assertIn("firmware 1.7.1 is the tested one", out)
+        self.assertIn("firmware 1.7.1.1 is the tested one", out)
         self.assertNotIn("[FAIL]", out)
         self.assertIn("VERDICT", out)
         self.assertIn("status file can be written (/var/volatile/tmp)", self.fails("robot", "scan", "Bob"))
@@ -164,7 +164,7 @@ class Flows(unittest.TestCase):
         home = self.alice / "home/booster"
         loop = home / "logs/bhumand_(2).log"
         dropin = home / ".config/systemd/user/bhuman.service.d/controls.conf"
-        info = self.alice / "opt/booster/robot_info.txt"
+        info = self.alice / "opt/booster/version.txt"
         saved_state = (self.alice / "run/user/1000/internalState.txt").read_text()
         saved_info = info.read_text()
         fakerobot._write(loop, "".join("12:00:%02d [cam_stream_receiver] unexpected calib size 858 (expected 490)"
@@ -173,7 +173,8 @@ class Flows(unittest.TestCase):
                                  "TimeoutStartSec=600\n")
         fakerobot._write(self.alice / "service.enabled", "disabled\n")
         fakerobot._write(self.alice / "nosudo", "")
-        fakerobot._write(info, "Booster K1\nfirmware 1.8.1.2\n")
+        fakerobot._write(info, saved_info + "\nVersion: 1.8.1.2-release-02884-2026-10-15-global\n"
+                               "Install time: Mon Nov 9 2026\n")
         shutil.rmtree(self.alice / "run")
         try:
             out = self.fails("robot", "scan", "Alice")

@@ -238,7 +238,10 @@ def make_robot(tmp: Path, name: str, ip: str, volatile: bool = False) -> Path:
     else:
         _write(root / "run" / "user" / "1000" / "internalState.txt", "0.83 47")
         _write(root / "etc" / "nv_tegra_release", "# R36 (release), REVISION: 4.3\n")
-    _write(root / "opt" / "booster" / "robot_info.txt", "Booster K1\nfirmware 1.7.1\n")
+    _write(root / "opt" / "booster" / "robot_info.txt", "Name: Booster K1\nModel Version: 1.0.1\n")
+    _write(root / "opt" / "booster" / "version.txt",
+           "Version: v1.6.2.2-release-02145-2026-06-03\nInstall time: Mon Jul 21 2026\n\n"
+           "Version: 1.7.1.1-release-00229-2026-07-18-global\nInstall time: Thu Oct 22 2026\n")
     _write(root / "opt" / "booster" / "config" / "containerd" / "config.yaml",
            "- name: ros.camera\n  enable: true\n- name: motion\n  enable: true\n- name: lui\n  enable: false\n")
     _write(root / "sys" / "devices" / "virtual" / "thermal" / "thermal_zone0" / "temp", "51500\n")

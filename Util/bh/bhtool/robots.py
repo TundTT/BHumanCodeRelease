@@ -40,6 +40,7 @@ ROBOT_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,30}$")
 SCAN_SCRIPT = r'''
 echo "@host $(hostname)"
 echo "@info $(tr '\n' ';' 2>/dev/null </opt/booster/robot_info.txt)"
+echo "@fw $(awk '/^Version:/ {v=$2} END {print v}' /opt/booster/version.txt 2>/dev/null)"
 echo "@kernel $(uname -r) $(uname -m)"
 echo "@disk $(df -Pk /home/booster 2>/dev/null | awk 'NR==2 {print $4}')"
 echo "@bhuman $([ -x /home/booster/bin/bhuman ] && echo yes || echo no) $([ -f /home/booster/Config/bhuman ] && echo yes || echo no) $(systemctl --user is-enabled bhuman.service 2>/dev/null || echo no)"
@@ -132,6 +133,7 @@ def analyse_scan(data: Dict[str, List[str]]) -> dict:
         "newest_log": first("lognew"),
         "log_repeats": _log_repeats(data.get("logrep", [])),
         "log_calibrations": int(first("logcalib") or 0) if first("logcalib").isdigit() else 0,
+        "firmware_installed": first("fw"),
         "complete": "end" in data,
     }
 
@@ -162,8 +164,13 @@ CAMERA_LOOP = re.compile(r"cam_stream_receiver.*(resync|unexpected calib)", re.I
 CAMERA_RELATED = re.compile(r"cam_stream_receiver", re.I)
 
 
-def firmware_version(info: List[str]) -> str:
-    """The robot firmware version from the lines of /opt/booster/robot_info.txt ('' if none is named)."""
+def firmware_version(info: List[str], installed: str = "") -> str:
+    """The robot firmware version: the last 'Version:' entry of /opt/booster/version.txt (the list of every
+    firmware the robot ever had, e.g. '1.8.1.2-release-02884-2026-10-15-global'), else a firmware line of
+    /opt/booster/robot_info.txt ('' if neither names one)."""
+    found = re.search(r"\d+\.\d+\.\d+(?:\.\d+)?", installed)
+    if found:
+        return found.group()
     for line in info:
         # "Model Version: 1.0.1" is the version of the robot model, not of the firmware
         if re.search(r"firmware|software|version", line, re.I) and not re.search(r"model", line, re.I):
@@ -235,10 +242,10 @@ def will_it_run(s: dict) -> List[tuple]:
     if s["camera_package"]:
         add("ok", "camera package booster-x5-camera %s" % s["camera_package"])
 
-    version = firmware_version(s["info"])
+    version = firmware_version(s["info"], s["firmware_installed"])
     if not version:
-        add("warn", "firmware version not found in /opt/booster/robot_info.txt (tested: %s)" % TESTED_FIRMWARE)
-    elif version == TESTED_FIRMWARE:
+        add("warn", "firmware version not found in /opt/booster/version.txt or robot_info.txt (tested: %s)" % TESTED_FIRMWARE)
+    elif version == TESTED_FIRMWARE or version.startswith(TESTED_FIRMWARE + "."):
         add("ok", "firmware %s is the tested one" % version)
     elif version.startswith("1.8.0"):
         add("warn", "firmware %s is known to misbehave with this code (tested: %s)" % (version, TESTED_FIRMWARE))
