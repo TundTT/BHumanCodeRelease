@@ -159,12 +159,14 @@ TESTED_FIRMWARE = "1.7.1"
 STATE_DIR_HINT = ("the robot software writes its battery/temperature file to /var/volatile/tmp (created by the "
                   "installer) or /run/user/<uid>")
 CAMERA_LOOP = re.compile(r"cam_stream_receiver.*(resync|unexpected calib)", re.I)
+CAMERA_RELATED = re.compile(r"cam_stream_receiver", re.I)
 
 
 def firmware_version(info: List[str]) -> str:
     """The robot firmware version from the lines of /opt/booster/robot_info.txt ('' if none is named)."""
     for line in info:
-        if re.search(r"firmware|version", line, re.I):
+        # "Model Version: 1.0.1" is the version of the robot model, not of the firmware
+        if re.search(r"firmware|software|version", line, re.I) and not re.search(r"model", line, re.I):
             found = re.search(r"\d+\.\d+\.\d+(?:\.\d+)?", line)
             if found:
                 return found.group()
@@ -214,9 +216,11 @@ def will_it_run(s: dict) -> List[tuple]:
             add("warn", "%s does not exist yet" % path)
 
     loops = [(n, t) for n, t in s["log_repeats"] if CAMERA_LOOP.search(t)]
-    others = [(n, t) for n, t in s["log_repeats"] if not CAMERA_LOOP.search(t)]
+    # the reconnects that belong to a reported loop are part of it, not further findings
+    others = [(n, t) for n, t in s["log_repeats"] if not CAMERA_LOOP.search(t) and not (loops and CAMERA_RELATED.search(t))]
     for n, text in loops:
-        add("fail", "camera stream is stuck in a loop: %d times in the last 20000 log lines: %s - the software "
+        add("fail", "camera stream is stuck in a loop: %d times in the last 20000 log lines (with the reconnects "
+                    "after it): %s - the software "
                     "gets no calibration and no images that way. The receiver (Util/X5Camera/include/"
                     "cam_stream_receiver.cpp) and the program on the camera board must come from the same "
                     "version%s" % (n, text, " (camera package %s)" % s["camera_package"] if s["camera_package"] else ""))
@@ -321,7 +325,7 @@ def print_scan(target: Target, s: dict) -> int:
     say("Will it run? (what the software needs while it runs)")
     checks = will_it_run(s)
     for level, text in checks:
-        {"ok": core.ok, "warn": core.warn, "fail": core.warn}[level]("%s%s" % ("FAIL: " if level == "fail" else "", text))
+        {"ok": core.ok, "warn": core.warn, "fail": core.bad}[level](text)
     say(verdict(checks))
     return issues + sum(1 for level, _ in checks if level != "ok")
 

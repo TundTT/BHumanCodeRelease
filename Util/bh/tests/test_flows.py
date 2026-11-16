@@ -154,7 +154,7 @@ class Flows(unittest.TestCase):
         self.assertIn("Will it run?", out)
         self.assertIn("status file can be written (/run/user/1000)", out)
         self.assertIn("firmware 1.7.1 is the tested one", out)
-        self.assertNotIn("FAIL:", out)
+        self.assertNotIn("[FAIL]", out)
         self.assertIn("VERDICT", out)
         self.assertIn("status file can be written (/var/volatile/tmp)", self.fails("robot", "scan", "Bob"))
 
@@ -177,11 +177,11 @@ class Flows(unittest.TestCase):
         shutil.rmtree(self.alice / "run")
         try:
             out = self.fails("robot", "scan", "Alice")
-            self.assertIn("FAIL: camera stream is stuck in a loop: 400 times", out)
+            self.assertIn("[FAIL] camera stream is stuck in a loop: 400 times", out)
             self.assertIn("unexpected calib size 858 (expected 490)", out)
             self.assertIn("bhuman.service is disabled", out)
             self.assertIn("controls.conf: ExecStartPre=sudo /usr/local/sbin/bhuman-control-routing bhuman", out)
-            self.assertIn("FAIL: ", out.split("controls.conf", 1)[1])         # sudo before every start, sudo not allowed
+            self.assertIn("[FAIL] ", out.split("controls.conf", 1)[1])         # sudo before every start, sudo not allowed
             self.assertIn("no writable directory for the status file", out)
             self.assertIn("firmware 1.8.1.2 has not been tested", out)
             self.assertIn("VERDICT: the software will NOT run properly", out)

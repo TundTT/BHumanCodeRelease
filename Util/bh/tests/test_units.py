@@ -249,6 +249,7 @@ class WillItRun(unittest.TestCase):
                                  "@dropinline /home/booster/.config/systemd/user/bhuman.service.d/controls.conf ExecStartPre=sudo x\n"
                                  "@campkg 1.0.2\n"
                                  "@logrep 19000 12:00:00 [cam_stream_receiver] unexpected calib size 858 (expected 490) - resyncing\n"
+                                 "@logrep 6666 [cam_stream_receiver] disconnected, retrying...\n"
                                  "@logrep 900 something else repeats\n@end"))
         checks = self.checks(text)
         levels = {level: " | ".join(t for l, t in checks if l == level) for level in ("ok", "warn", "fail")}
@@ -259,6 +260,7 @@ class WillItRun(unittest.TestCase):
         self.assertIn("bhuman.service is disabled", levels["warn"])
         self.assertIn("no writable directory for the status file", levels["warn"])
         self.assertIn("something else repeats", levels["warn"])
+        self.assertNotIn("disconnected, retrying", levels["warn"])                # part of the reported loop
         self.assertIn("has not been tested", levels["warn"])
         self.assertIn("will NOT run", robots.verdict(checks))
 
@@ -266,6 +268,7 @@ class WillItRun(unittest.TestCase):
         self.assertEqual(robots.firmware_version(["Booster K1", "firmware 1.7.1"]), "1.7.1")
         self.assertEqual(robots.firmware_version(["Version: 1.8.1.2"]), "1.8.1.2")
         self.assertEqual(robots.firmware_version(["Booster K1"]), "")
+        self.assertEqual(robots.firmware_version(["Booster K1", "Model Version: 1.0.1"]), "")   # not the firmware
 
     def test_the_status_file_is_looked_for_where_the_software_writes_it(self):
         # InternalStateProvider.cpp, DeployDialog.cpp and bh status must agree on the places.
