@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot dashboard</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --ink: #16181d; --muted: #667085; --line: #e2e5ea;
+    --ok: #17803d; --warn: #b25e00; --fail: #c62828; --accent: #1f5fd6; --chip: #eef1f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111317; --card: #1b1e24; --ink: #eceef2; --muted: #9aa3b2; --line: #2b3038;
+            --ok: #4cc27a; --warn: #f0a44b; --fail: #ff6b6b; --accent: #7aa7ff; --chip: #262b33; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--card); border-bottom: 1px solid var(--line);
+           padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  h1 { font-size: 16px; margin: 0; }
+  .game { flex: 1 1 280px; min-width: 0; }
+  .game b { font-size: 15px; text-transform: uppercase; letter-spacing: .04em; }
+  .muted { color: var(--muted); }
+  button { font: inherit; border: 1px solid var(--line); background: var(--chip); color: var(--ink);
+           border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.stop { background: var(--fail); color: #fff; border-color: var(--fail); font-weight: 700; padding: 8px 16px; }
+  .bar { padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; border-bottom: 1px solid var(--line); }
+  .bar .label { font-weight: 600; margin-right: 4px; }
+  main { padding: 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+  .card.offline { opacity: .65; }
+  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .name { font-size: 17px; font-weight: 700; }
+  .chip { display: inline-block; background: var(--chip); border-radius: 999px; padding: 1px 9px; font-size: 12px; white-space: nowrap; }
+  .chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); } .chip.fail { color: var(--fail); }
+  .grid { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 10px 0; }
+  .grid dt { color: var(--muted); } .grid dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .meter { height: 6px; border-radius: 3px; background: var(--chip); overflow: hidden; margin-top: 4px; }
+  .meter i { display: block; height: 100%; background: var(--ok); }
+  .meter i.warn { background: var(--warn); } .meter i.fail { background: var(--fail); }
+  ul.notes { list-style: none; margin: 8px 0; padding: 0; }
+  ul.notes li { padding-left: 14px; position: relative; }
+  ul.notes li::before { content: ""; position: absolute; left: 0; top: .55em; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  ul.notes li.warn::before { background: var(--warn); } ul.notes li.fail::before { background: var(--fail); }
+  pre { margin: 8px 0 0; padding: 8px; background: var(--chip); border-radius: 6px; font: 12px/1.4 ui-monospace, Consolas, monospace;
+        white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9.5em; overflow: auto; }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  details { margin: 0 16px 16px; } summary { cursor: pointer; color: var(--muted); }
+  table { border-collapse: collapse; margin-top: 6px; } td { padding: 2px 14px 2px 0; }
+  #toast { position: fixed; right: 16px; bottom: 16px; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 6px; display: none; }
+  .empty { padding: 24px 16px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Robot dashboard</h1>
+  <div class="game" id="game"></div>
+  <button class="stop" id="stopAll" title="Ends the robot software on every robot. Robots go limp.">STOP ALL</button>
+</header>
+<div class="bar" id="guardBar" hidden></div>
+<div class="bar" id="gcBar" hidden></div>
+<main id="robots"></main>
+<div class="empty" id="empty" hidden>No robots registered. Add one with <code>bh robot onboard NAME --id N</code>.</div>
+<details><summary>Back LED colours</summary><table id="legend"></table></details>
+<details><summary>Recent actions</summary><pre id="messages"></pre></details>
+<div id="toast"></div>
+<script>
+"use strict";
+const token = new URLSearchParams(location.search).get("t") || "";
+const $ = id => document.getElementById(id);
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+function toast(text) { const t = $("toast"); t.textContent = text; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 2500); }
+async function act(body, question) {
+  if (question && !confirm(question)) return;
+  try {
+    const r = await fetch("/api/action", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(Object.assign({token}, body))});
+    const j = await r.json(); toast(j.ok || j.error || "done");
+  } catch (e) { toast("dashboard not reachable"); }
+  refresh();
+}
+function btn(text, fn, cls, title) { const b = el("button", cls, text); if (title) b.title = title; b.onclick = fn; return b; }
+function mmss(s) { s = Math.max(0, s | 0); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+function ago(s) { if (s == null) return "?"; s = s | 0; return s < 90 ? s + " s" : s < 5400 ? Math.round(s / 60) + " min" : (s / 3600).toFixed(1) + " h"; }
+
+function renderGame(st) {
+  const g = st.game, box = $("game"); box.textContent = "";
+  if (!g) { box.append(el("span", "muted", "No GameController heard" + (st.testgc ? " yet" : " (bh gc doctor)") + ". Robots follow their buttons.")); return; }
+  if (g.problem && !g.state) { box.append(el("span", "chip fail", g.problem)); return; }
+  box.append(el("b", "", g.state + (g.stopped ? " - STOPPED" : "")));
+  let text = "  " + (g.first_half ? "1st" : "2nd") + " half, " + mmss(g.secs) + " left   team " + g.teams[0] + "  " + g.score[0] + " : " + g.score[1] + "  team " + g.teams[1];
+  if (g.set_play !== "none") text += "   " + g.set_play;
+  if (g.secondary > 0) text += "   (" + g.secondary + " s)";
+  box.append(el("span", "", text));
+  box.append(el("div", "muted", "GameController " + g.source + (st.testgc ? " (TEST controller of this dashboard)" : "") + (g.age > 3 ? " - LOST " + ago(g.age) + " ago" : "") + (g.own_in_game ? "" : " - team " + st.team + " is NOT in this game")));
+}
+// Parts of the page are only rebuilt when what they show has changed. Otherwise a button
+// could be replaced between pressing and releasing the mouse and the click would be lost.
+const shown = new Map();
+function changed(key, value) { const j = JSON.stringify(value); if (shown.get(key) === j) return false; shown.set(key, j); return true; }
+function renderBars(st) {
+  const gb = $("guardBar"), cb = $("gcBar"), g = st.game || {};
+  if (changed("guard", st.guard)) {
+    gb.hidden = !st.guard.enabled; gb.textContent = "";
+    if (st.guard.enabled) {
+      gb.append(el("span", "label", "Laptop guard"));
+      gb.append(btn("RUN - robots may move", () => act({action: "guard", released: true}), st.guard.released ? "on" : ""));
+      gb.append(btn("STOP - robots stand still", () => act({action: "guard", released: false}), st.guard.released ? "" : "on"));
+      gb.append(el("span", "muted", "Closing this tab stops the robots."));
+    }
+  }
+  if (changed("gc", [st.testgc, g.state, g.stopped])) {
+    cb.hidden = !st.testgc; cb.textContent = "";
+    if (st.testgc) {
+      cb.append(el("span", "label", "Test GameController"));
+      for (const s of ["initial", "ready", "set", "playing", "finished"])
+        cb.append(btn(s, () => act({action: "gc_state", state: s}), g.state === s ? "on" : ""));
+      const stopped = !!g.stopped;
+      cb.append(btn(stopped ? "RELEASE (go)" : "FREEZE (stop flag)", () => act({action: "gc_stopped", stopped: !stopped}), stopped ? "on" : "", "All robots stand still while the stop flag is set."));
+      cb.append(btn("goal for us", () => act({action: "gc_goal", own: true})));
+      cb.append(btn("goal against", () => act({action: "gc_goal", own: false})));
+    }
+  }
+}
+function row(dl, k, v) { if (v === undefined || v === null || v === "") return; dl.append(el("dt", "", k)); const dd = el("dd"); if (v instanceof Node) dd.append(v); else dd.textContent = v; dl.append(dd); }
+function meter(pct, level) { const m = el("div", "meter"), i = el("i", level || ""); i.style.width = Math.max(0, Math.min(100, pct)) + "%"; m.append(i); return m; }
+function renderInfo(c, s) {
+  c.textContent = "";
+  const top = el("div", "top"); top.append(el("span", "name", s.name));
+  const sw = s.reachable == null ? ["", "checking..."] : !s.reachable ? ["fail", "offline"] : s.service === "active" ? ["ok", "running"] : s.service === "failed" ? ["fail", "crashed"] : ["warn", "not running"];
+  top.append(el("span", "chip " + sw[0], sw[1])); c.append(top);
+  c.append(el("div", "muted", s.ip + (s.model ? "  " + s.model.toUpperCase() : "") + (s.hardware ? "  (" + s.hardware + ")" : "")));
+  if (!s.reachable) { if (s.error) c.append(el("div", "muted", s.error)); return; }
+  const dl = el("dl", "grid"), cfg = s.settings || {};
+  if (s.battery != null) { const d = el("div"); d.append(s.battery + " %"); d.append(meter(s.battery, s.battery_level === "ok" ? "" : s.battery_level)); row(dl, "battery", d); }
+  else row(dl, "battery", "unknown");
+  row(dl, "temperature", (s.max_temp != null ? "hottest joint " + s.max_temp + " C" : "joints ?") + (s.zones && s.zones.length ? ", computer " + Math.max(...s.zones).toFixed(0) + " C" : ""));
+  row(dl, "identity", "team " + (cfg.teamNumber || "?") + ", player " + (cfg.playerNumber || "?"));
+  row(dl, "setup", (cfg.scenario || "?") + " / " + (cfg.location || "?") + (s.led ? ", LED mode " + s.led : ""));
+  if (s.gc) row(dl, "referee", s.gc.penalty === "none" ? "in play" : "PENALIZED: " + s.gc.penalty + (s.gc.secs ? " (" + s.gc.secs + " s)" : ""));
+  if (s.reply) row(dl, "robot says", (s.reply.fallen ? "FALLEN, " : "upright, ") + "at x " + s.reply.pose[0] + " y " + s.reply.pose[1] + " mm facing " + s.reply.pose[2] + " deg; ball " + (s.reply.ball_age < 0 ? "never seen" : "seen " + s.reply.ball_age + " s ago") + (s.reply.age > 3 ? " (stale " + ago(s.reply.age) + ")" : ""));
+  row(dl, "computer", [s.load && s.load.length ? "load " + s.load[0] : "", s.mem_pct != null ? "memory " + s.mem_pct + " %" : "", s.disk_free_gb != null ? s.disk_free_gb + " GB free" : ""].filter(Boolean).join(", "));
+  if (s.wifi) row(dl, "wifi", s.wifi.dbm + " dBm (" + s.wifi.device + ")");
+  row(dl, "switched on", ago(s.uptime_s) + " ago" +(s.binary_time && s.robot_time ? ", deployed " + ago(s.robot_time - s.binary_time) + " ago" : ""));
+  c.append(dl);
+  const notes = el("ul", "notes");
+  for (const [level, text] of (s.assess || [])) if (level !== "ok") notes.append(el("li", level, text));
+  if (notes.children.length) c.append(notes);
+  if (s.log && s.log.length) c.append(el("pre", "", s.log.join("\n")));
+}
+function renderActions(a, name, passive, player, penalized) {
+  a.textContent = "";
+  if (passive) return;
+  a.append(btn("Stop", () => act({action: "stop", robot: name}), "", "Ends the robot software: the robot goes limp."));
+  a.append(btn("Start", () => act({action: "start", robot: name})));
+  a.append(btn("Restart", () => act({action: "restart", robot: name}, "Restarting makes " + name + " go limp for a moment. Is it sitting or held?")));
+  if (player) a.append(btn(penalized ? "Unpenalize" : "Penalize", () => act({action: "gc_penalize", player, on: !penalized}), penalized ? "on" : ""));
+}
+const cards = new Map();
+function renderRobots(st) {
+  const box = $("robots"), seen = new Set();
+  for (const s of st.robots) {
+    seen.add(s.name);
+    let card = cards.get(s.name);
+    if (!card) {
+      card = {root: el("div", "card"), info: el("div"), actions: el("div", "actions"), hint: el("div", "muted", "Joint angles, camera, behaviour: bh connect " + s.name)};
+      card.root.append(card.info, card.actions, card.hint); cards.set(s.name, card); box.append(card.root);
+    }
+    card.root.className = "card" + (s.reachable === false ? " offline" : "");
+    card.hint.hidden = !s.reachable;
+    // The time of the poll and the age of the robot's answer change all the time without changing what is shown.
+    const view = Object.assign({}, s, {time: 0, reply: s.reply && Object.assign({}, s.reply, {age: s.reply.age > 3 ? s.reply.age : 0})});
+    if (changed("info:" + s.name, view)) renderInfo(card.info, s);
+    const player = st.testgc ? parseInt((s.settings || {}).playerNumber, 10) || 0 : 0;
+    const penalized = !!(s.gc && s.gc.penalty !== "none");
+    const noActions = st.passive || !s.reachable;   // nothing to click for a robot that cannot be reached
+    if (changed("actions:" + s.name, [noActions, player, penalized])) renderActions(card.actions, s.name, noActions, player, penalized);
+  }
+  for (const [name, card] of cards) if (!seen.has(name)) { card.root.remove(); cards.delete(name); shown.delete("info:" + name); shown.delete("actions:" + name); }
+  $("empty").hidden = st.robots.length > 0;
+}
+let legendDone = false;
+async function refresh() {
+  let st;
+  try { st = await (await fetch("/api/state?t=" + encodeURIComponent(token))).json(); }
+  catch (e) { $("game").textContent = "Dashboard process is not running (bh dash)."; return; }
+  if (st.error) { $("game").textContent = st.error; return; }
+  renderGame(st); renderBars(st); renderRobots(st);
+  $("stopAll").hidden = st.passive;
+  const messages = (st.messages || []).join("\n") || "nothing yet";
+  if ($("messages").textContent !== messages) $("messages").textContent = messages;
+  if (!legendDone) { for (const [led, meaning] of st.legend) { const tr = el("tr"); tr.append(el("td", "", led), el("td", "muted", meaning)); $("legend").append(tr); } legendDone = true; }
+}
+$("stopAll").onclick = () => act({action: "stop_all"});
+refresh(); setInterval(refresh, 1000);
+</script>
+</body>
+</html>

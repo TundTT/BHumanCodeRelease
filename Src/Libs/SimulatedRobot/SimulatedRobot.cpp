@@ -67,6 +67,19 @@ void SimulatedRobot::setBall(SimRobot::Object* ball)
   SimulatedRobot::ball = ball;
 }
 
+Vector3f SimulatedRobot::getBallPositionOfFirstTeam()
+{
+  Vector3f position = ball ? getPosition3D(ball) : Vector3f::Zero();
+  position.head<2>() *= -1.f; // The simulation scene uses the coordinate system of the second team.
+  return position;
+}
+
+bool SimulatedRobot::isUpright() const
+{
+  Pose2f pose;
+  return getPose2f(robot, pose);
+}
+
 void SimulatedRobot::getWorldState(GroundTruthWorldState& worldState) const
 {
   // Initialize world state

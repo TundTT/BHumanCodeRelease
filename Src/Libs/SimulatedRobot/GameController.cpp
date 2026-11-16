@@ -15,7 +15,17 @@
 #include "Platform/Time.h"
 #include "Representations/Configuration/RobotDimensions.h"
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <string>
 #include <SimRobotCore3.h>
+#ifdef WINDOWS
+#include <process.h>
+#define PROCESS_ID _getpid()
+#else
+#include <unistd.h>
+#define PROCESS_ID getpid()
+#endif
 
 GameController::GameController() :
   theTeamMessageChannel(new TeamMessageChannel[2] { {inTeamMessage, outTeamMessage}, {inTeamMessage, outTeamMessage} })
@@ -37,11 +47,55 @@ GameController::GameController() :
   // Force reloading of the field dimensions (they cannot be loaded here because the file search path is not available yet).
   fieldDimensions.xPosOwnPenaltyMark = 0.f;
   resetBallContacts();
+  // BH_STATS_FILE=<prefix> records <prefix>_<process id>.csv with the ground truth (BH_STATS_PERIOD in ms, default 100).
+  if(const char* prefix = std::getenv("BH_STATS_FILE"))
+  {
+    if(const char* period = std::getenv("BH_STATS_PERIOD"))
+      statsPeriod = static_cast<unsigned>(std::max(10, std::atoi(period)));
+    statsFile = std::fopen((std::string(prefix) + "_" + std::to_string(static_cast<int>(PROCESS_ID)) + ".csv").c_str(), "w");
+  }
 }
 
 GameController::~GameController()
 {
+  if(statsFile)
+    std::fclose(statsFile);
   delete[] theTeamMessageChannel;
+}
+
+void GameController::writeStats()
+{
+  if(!statsFile)
+    return;
+  const unsigned now = Time::getCurrentSystemTime();
+  if(statsRows && now - timeWhenStatsWritten < statsPeriod)
+    return;
+  if(!statsRows)
+  {
+    std::fprintf(statsFile, "t,run,state,setPlay,half,scoreA,scoreB,ballX,ballY,ballZ");
+    for(int i = 0; i < numOfRobots; ++i)
+      if(robots[i].simulatedRobot)
+        std::fprintf(statsFile, ",r%dx,r%dy,r%drot,r%dup,r%dpen", i, i, i, i, i);
+    std::fprintf(statsFile, "\n");
+  }
+  timeWhenStatsWritten = now;
+  ++statsRows;
+  const Vector3f ball = SimulatedRobot::getBallPositionOfFirstTeam();
+  std::fprintf(statsFile, "%u,%d,%d,%d,%d,%d,%d,%.0f,%.0f,%.0f", now, testRunCounter, gameControllerData.state, gameControllerData.setPlay,
+               gameControllerData.firstHalf, gameControllerData.teams[0].score, gameControllerData.teams[1].score, ball.x(), ball.y(), ball.z());
+  for(int i = 0; i < numOfRobots; ++i)
+    if(robots[i].simulatedRobot)
+    {
+      Pose2f pose;
+      robots[i].simulatedRobot->getRobotPose(pose); // In the coordinate system of the robot's own team.
+      if(i >= numOfRobots / 2)
+        pose = Pose2f(pi) + pose; // The second team's robots are given in the coordinate system of the first team.
+      std::fprintf(statsFile, ",%.0f,%.0f,%.3f,%d,%d", pose.translation.x(), pose.translation.y(), static_cast<float>(pose.rotation),
+                   robots[i].simulatedRobot->isUpright() ? 1 : 0, static_cast<int>(robots[i].info->penalty));
+    }
+  std::fprintf(statsFile, "\n");
+  if(statsRows % 100 == 0)
+    std::fflush(statsFile);
 }
 
 void GameController::setTeamInfos(const std::array<TeamInfo, 2>& teamInfos)
@@ -432,6 +486,7 @@ bool GameController::checkIllegalPositionInSet(int robot) const
 
 void GameController::update()
 {
+  writeStats();
   for(int i = 0; i < numOfRobots; ++i)
   {
     Robot& r = robots[i];

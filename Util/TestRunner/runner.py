@@ -76,14 +76,22 @@ def get_bhuman_root():
     Raises:
         FileNotFoundError: If the B-Human root directory is not found.
     """
-    current_dir = os.path.abspath(os.getcwd())
-    while True:
-        if os.path.basename(current_dir) == "B-Human" and os.path.isdir(pjoin(current_dir, "Config")):
-            return current_dir
-        parent_dir = os.path.dirname(current_dir)
-        if parent_dir == current_dir:
-            raise FileNotFoundError("This script must be run from within the B-Human directory.")
-        current_dir = parent_dir
+    def is_root(path):
+        # Recognize the repository by its layout, not by its directory name:
+        # a checkout may be called anything (e.g. "BHumanCodeRelease").
+        return all(os.path.isdir(pjoin(path, d)) for d in ("Config", "Make", "Src"))
+
+    # Try the working directory first, then the location of this script (Util/TestRunner).
+    for start in (os.getcwd(), os.path.dirname(os.path.abspath(__file__))):
+        current_dir = os.path.abspath(start)
+        while True:
+            if is_root(current_dir):
+                return current_dir
+            parent_dir = os.path.dirname(current_dir)
+            if parent_dir == current_dir:
+                break
+            current_dir = parent_dir
+    raise FileNotFoundError("This script must be run from within the B-Human directory.")
 
 
 def get_bhuman_relpath(file_path):

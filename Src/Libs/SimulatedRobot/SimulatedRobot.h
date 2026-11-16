@@ -215,6 +215,18 @@ public:
   static void applyBallFriction(float friction);
 
   /**
+   * The position of the ball in the coordinate system of the first team (for statistics; a ball is required).
+   * @return The ball's center in mm.
+   */
+  static Vector3f getBallPositionOfFirstTeam();
+
+  /**
+   * Whether this robot is currently standing (and not lying on the ground), for statistics.
+   * @return \c true if upright.
+   */
+  bool isUpright() const;
+
+  /**
    * Determines whether a robot is member of the first or second team
    * @param obj The robot
    * @return \c true if the robot is in the first team; \c false otherwise

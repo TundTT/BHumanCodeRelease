@@ -74,7 +74,11 @@ copy()
   rsync --del --exclude=.* --exclude=default --chmod=u+rw,go+r,Dugo+x -zrce "ssh $SSHOPTIONS" ../../Install/Profiles/. $TARGET_USER@$REMOTE:/home/$TARGET_USER/Profiles
 
   #check if PROFILE is existent
-  if [ ! -r "../../Install/Profiles/$PROFILE" ]; then
+  if [ -z "$PROFILE" ]; then
+    # Without -w, "setprofile" used to be called without arguments, printed its
+    # usage and aborted the deployment half-way (no ONNX runtime links, no settings).
+    echo "no wireless profile given, keeping the current network setup"
+  elif [ ! -r "../../Install/Profiles/$PROFILE" ]; then
     echo "wireless profile \"$PROFILE\" is not existent, that profile is not activated" >&2
   else
     RESULT=`ssh $SSHOPTIONS $TARGET_USER@$REMOTE "/home/$TARGET_USER/bin/setprofile $PROFILE"`
@@ -146,6 +150,10 @@ cd "$(dirname "$(which "$0")")"
 
 source ../Common/libBHuman
 source ../Common/setupSSH
+
+# libBHuman installs an exit handler that always exits with 0, so a deployment that
+# was aborted by "set -e" (e.g. a failed rsync) looked successful to the caller.
+trap 'error_and_exit $?' EXIT
 
 # init variables
 CONFIG="Develop"
@@ -228,7 +236,7 @@ while true; do
       MULTIPLEDATA[$NUMMULTIPLE]=$1
       shift
       MULTIPLEDATA[$NUMMULTIPLE + 1]=`$RESOLVE <<<"$1"`
-      source ../Common/setupTarget "$MULTIPLEDATA[$NUMMULTIPLE + 1]"
+      source ../Common/setupTarget "${MULTIPLEDATA[$NUMMULTIPLE + 1]}"
       declare TARGET_$TARGET_NAME=$TARGET_NAME
       let "NUMMULTIPLE+=2"
       ;;
@@ -350,12 +358,20 @@ if [ ! -z $REMOTE ]; then # deploy to a single robot
 else # try to deploy to multiple targets
   trap "trap - SIGTERM && kill -- -$$ 2>/dev/null" SIGINT SIGTERM
   if [ "$NUMMULTIPLE" -ne 0 ]; then
+    PIDS=
     for ((i=0; i < NUMMULTIPLE; i+=2))
     do
-      copy ${MULTIPLEDATA[i+1]} ${MULTIPLEDATA[i]} 2> >(sed "s%^%[${MULTIPLEDATA[i+1]}] %" >&2) \
-      | sed "s%^%[${MULTIPLEDATA[i+1]}] %" &
+      ( set -o pipefail
+        copy ${MULTIPLEDATA[i+1]} ${MULTIPLEDATA[i]} 2> >(sed "s%^%[${MULTIPLEDATA[i+1]}] %" >&2) \
+        | sed "s%^%[${MULTIPLEDATA[i+1]}] %" ) &
+      PIDS="$PIDS $!"
     done
-    wait
+    # Report a failure for any robot instead of always exiting with 0.
+    FAILED=
+    for PID in $PIDS; do
+      wait $PID || FAILED=1
+    done
+    [ -z "$FAILED" ] || error_and_exit 1 "deploying to at least one robot failed"
   else
     error_and_exit 1
   fi

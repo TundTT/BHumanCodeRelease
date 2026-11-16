@@ -127,6 +127,11 @@ private:
   int testRuns = 0;
   int testRunCounter = 0;
 
+  FILE* statsFile = nullptr; /**< Optional recording of ground truth for evaluations (environment variable BH_STATS_FILE). */
+  unsigned timeWhenStatsWritten = 0; /**< The simulated time of the last row in \c statsFile. */
+  unsigned statsPeriod = 100; /**< The simulated time between two rows in \c statsFile in ms (BH_STATS_PERIOD). */
+  unsigned statsRows = 0; /**< The number of rows written so far. */
+
   TeamMessageContainer inTeamMessage;
   TeamMessageContainer outTeamMessage;
   TeamMessageChannel* theTeamMessageChannel;
@@ -190,6 +195,14 @@ public:
   /** Executes the automatic referee. */
   void update();
 
+private:
+  /**
+   * Appends a row with the state of the game, the ball and all robots to the statistics file, if there
+   * is one. Only used to measure what decides games; it does not influence the simulation.
+   */
+  void writeStats();
+
+public:
   /**
    * Proclaims which robot touched the ball at last
    * @param robot The robot

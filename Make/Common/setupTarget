@@ -2,8 +2,13 @@
 # Defines the variables "TARGET_USER", "TARGET_NAME", "TARGET_ARCH", and
 # "TARGET_MODEL" based on an IP address.
 
-_BASEPATH=$(cd "$(dirname "$(which "$0")")" && pwd)
-_NAME=$(cd "$_BASEPATH/../../Config/Robots"; grep "$1" */network.cfg | sed 's%/.*%%')
+# Located relative to this file: "$0" is the calling script, which cannot be found
+# any more once that script changed its directory after being started by relative path.
+_BASEPATH=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# Match the complete quoted address and list file names only. A plain grep for the
+# address printed no file name if only one robot was registered (so that robot was
+# never found), and "192.168.5.1" also matched the robot at "192.168.5.14".
+_NAME=$(cd "$_BASEPATH/../../Config/Robots"; grep -lF "\"$1\"" */network.cfg 2>/dev/null | head -1 | sed 's%/.*%%')
 _ROBOTTYPE=$(cd "$_BASEPATH/../../Config/Robots"; grep -E "\"$_NAME\"" robots.cfg | sed 's%.*robotType *= *\([^;]*\).*%\1%')
 case "$_ROBOTTYPE" in
   k1)
