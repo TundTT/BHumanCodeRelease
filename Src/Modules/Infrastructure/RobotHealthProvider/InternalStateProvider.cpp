@@ -9,8 +9,33 @@
 
 #include "InternalStateProvider.h"
 #include "Streaming/OutStreams.h"
+#include <string>
+#ifdef TARGET_ROBOT
+#include <unistd.h>
+#endif
 
 MAKE_MODULE(InternalStateProvider);
+
+namespace
+{
+  /**
+   * The file the internal state is written to. It is read by the DeployDialog and by "bh status"
+   * (Util/bh/bhtool/remote.py, STATUS_SCRIPT) - keep the candidates there in sync.
+   * /var/volatile/tmp is created by Install/Files/install; a robot that was not installed this way
+   * (e.g. stock Ubuntu on a Jetson) does not have it, but always has /run/user/<uid> while the user
+   * service runs.
+   * @return The path of the file, or an empty string if there is no directory to write to.
+   */
+  std::string stateFilePath()
+  {
+#ifdef TARGET_ROBOT
+    for(const std::string& directory : {std::string("/var/volatile/tmp"), "/run/user/" + std::to_string(getuid())})
+      if(access(directory.c_str(), W_OK) == 0)
+        return directory + "/internalState.txt";
+#endif
+    return std::string();
+  }
+}
 
 InternalStateProvider::InternalStateProvider()
 {
@@ -55,7 +80,10 @@ void InternalStateProvider::writer()
       SYNC;
       internalState = theInternalState;
     }
-    OutTextFile stream("/var/volatile/tmp/internalState.txt");
+    const std::string path = stateFilePath();
+    if(path.empty())
+      continue;
+    OutTextFile stream(path);
     if(stream.exists())
       stream << internalState.batteryLevel << static_cast<int>(internalState.maxTemperature);
   }

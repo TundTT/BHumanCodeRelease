@@ -54,6 +54,26 @@ crontab -l 2>/dev/null </dev/null | grep -v '^[[:space:]]*#' | grep -v '^[[:spac
 ps -eo pcpu,user,comm --sort=-pcpu --no-headers 2>/dev/null </dev/null | head -15 | sed 's/^/@proc /'
 if command -v docker >/dev/null 2>&1; then docker ps --format '{{.Names}} {{.Image}}' 2>/dev/null </dev/null | sed 's/^/@docker /'; fi
 ls -1 /home/booster/.config/autostart 2>/dev/null | sed 's/^/@autostart /'
+echo "@svcactive $(systemctl --user is-active bhuman.service 2>/dev/null </dev/null)"
+echo "@svcenabled $(systemctl --user is-enabled bhuman.service 2>/dev/null </dev/null)"
+echo "@svcfailed $(systemctl --user is-failed bhuman.service 2>/dev/null </dev/null)"
+for f in /home/booster/.config/systemd/user/bhuman.service.d/*.conf; do
+  [ -f "$f" ] && { echo "@dropin $f"; grep -E '^(Exec[A-Za-z]*|Environment|Timeout[A-Za-z]*|Restart)=' "$f" 2>/dev/null | sed "s|^|@dropinline $f |"; }
+done
+for d in /var/volatile/tmp "/run/user/$(id -u)"; do
+  if [ -d "$d" ] && [ -w "$d" ]; then echo "@statedir $d yes"; else echo "@statedir $d no"; fi
+done
+for d in /home/booster/logs /home/booster/Config; do
+  if [ ! -d "$d" ]; then echo "@dir $d missing"; elif [ -w "$d" ]; then echo "@dir $d yes"; else echo "@dir $d no"; fi
+done
+if sudo -n -l /bin/systemctl </dev/null >/dev/null 2>&1; then echo "@sudo yes"; else echo "@sudo no"; fi
+echo "@campkg $(dpkg-query -W -f='${Version}' booster-x5-camera 2>/dev/null </dev/null)"
+f=$(ls -t /home/booster/logs/bhumand_*.log 2>/dev/null </dev/null | head -1)
+if [ -n "$f" ]; then
+  echo "@lognew $f"
+  tail -n 20000 "$f" 2>/dev/null </dev/null | awk '{k=$0; gsub(/[0-9]+/, "N", k); c[k]++; if (!(k in s)) s[k]=$0} END {for (k in c) if (c[k] >= 200) print c[k], s[k]}' | sort -rn | head -5 | sed 's/^/@logrep /'
+  echo "@logcalib $(tail -n 20000 "$f" 2>/dev/null </dev/null | grep -c 'calibration received')"
+fi
 echo "@end"
 '''
 
@@ -101,8 +121,139 @@ def analyse_scan(data: Dict[str, List[str]]) -> dict:
         "busy_processes": busy,
         "docker": data.get("docker", []),
         "autostart": data.get("autostart", []),
+        "service_active": first("svcactive"),
+        "service_failed": first("svcfailed") == "failed",
+        "service_enabled_state": first("svcenabled"),
+        "dropins": _dropins(data),
+        "state_dirs": {p: v == "yes" for p, v in (line.rsplit(None, 1) for line in data.get("statedir", []) if " " in line)},
+        "dirs": {p: v for p, v in (line.rsplit(None, 1) for line in data.get("dir", []) if " " in line)},
+        "sudo_systemctl": first("sudo") == "yes",
+        "camera_package": first("campkg"),
+        "newest_log": first("lognew"),
+        "log_repeats": _log_repeats(data.get("logrep", [])),
+        "log_calibrations": int(first("logcalib") or 0) if first("logcalib").isdigit() else 0,
         "complete": "end" in data,
     }
+
+
+def _dropins(data: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    """Drop-in files that change bhuman.service -> the lines in them that matter (Exec..., Timeout...)."""
+    result: Dict[str, List[str]] = {f: [] for f in data.get("dropin", [])}
+    for line in data.get("dropinline", []):
+        name, _, text = line.partition(" ")
+        result.setdefault(name, []).append(text.strip())
+    return result
+
+
+def _log_repeats(lines: List[str]) -> List[tuple]:
+    """(count, example line) of the lines that fill the log: '829000 [cam_stream_receiver] ...'."""
+    found = []
+    for line in lines:
+        count, _, text = line.partition(" ")
+        if count.isdigit():
+            found.append((int(count), text.strip()))
+    return found
+
+
+TESTED_FIRMWARE = "1.7.1"
+STATE_DIR_HINT = ("the robot software writes its battery/temperature file to /var/volatile/tmp (created by the "
+                  "installer) or /run/user/<uid>")
+CAMERA_LOOP = re.compile(r"cam_stream_receiver.*(resync|unexpected calib)", re.I)
+
+
+def firmware_version(info: List[str]) -> str:
+    """The robot firmware version from the lines of /opt/booster/robot_info.txt ('' if none is named)."""
+    for line in info:
+        if re.search(r"firmware|version", line, re.I):
+            found = re.search(r"\d+\.\d+\.\d+(?:\.\d+)?", line)
+            if found:
+                return found.group()
+    return ""
+
+
+def will_it_run(s: dict) -> List[tuple]:
+    """Can this code run on the robot as it is? (level, text) with level 'ok', 'warn' or 'fail'.
+    The scan before looked at what is installed; this looks at what the software needs while it runs
+    (writable places, a service that starts, a camera that delivers, the firmware). Pure function."""
+    checks: List[tuple] = []
+    add = lambda level, text: checks.append((level, text))
+
+    if not s["installed"]:
+        add("fail", "the start scripts are not installed (bh robot install)")
+    elif not s["deployed"]:
+        add("warn", "nothing is deployed yet (bh deploy)")
+    else:
+        add("ok", "software is on the robot (~/bin/bhuman, ~/Config/bhuman)")
+
+    if s["installed"]:
+        if s["service_failed"]:
+            add("fail", "bhuman.service has failed - look at 'systemctl --user status bhuman' and the newest log")
+        enabled = s["service_enabled_state"]
+        if enabled != "enabled":
+            add("warn", "bhuman.service is %s: after a reboot or a battery change the software stays off "
+                        "(systemctl --user enable bhuman)" % (enabled or "not known to systemd"))
+        else:
+            add("ok", "bhuman.service starts by itself after a reboot (now: %s)" % (s["service_active"] or "unknown"))
+    for name, lines in sorted(s["dropins"].items()):
+        add("warn", "bhuman.service is changed by %s: %s" % (name, "; ".join(lines) or "(no Exec/Timeout lines)"))
+        if any("sudo" in line for line in lines) and not s["sudo_systemctl"]:
+            add("fail", "%s runs sudo before or after every start, but 'sudo -n' is not allowed here" % name)
+
+    dirs = s["state_dirs"]
+    if not dirs:
+        pass
+    elif any(dirs.values()):
+        add("ok", "status file can be written (%s)" % ", ".join(sorted(p for p, w in dirs.items() if w)))
+    else:
+        add("warn", "no writable directory for the status file (%s); none of %s can be written, so bh status "
+                    "and the dashboard show the battery as unknown" % (STATE_DIR_HINT, ", ".join(sorted(dirs))))
+    for path, state in sorted(s["dirs"].items()):
+        if state == "no":
+            add("fail", "%s is not writable by user booster" % path)
+        elif state == "missing":
+            add("warn", "%s does not exist yet" % path)
+
+    loops = [(n, t) for n, t in s["log_repeats"] if CAMERA_LOOP.search(t)]
+    others = [(n, t) for n, t in s["log_repeats"] if not CAMERA_LOOP.search(t)]
+    for n, text in loops:
+        add("fail", "camera stream is stuck in a loop: %d times in the last 20000 log lines: %s - the software "
+                    "gets no calibration and no images that way. The receiver (Util/X5Camera/include/"
+                    "cam_stream_receiver.cpp) and the program on the camera board must come from the same "
+                    "version%s" % (n, text, " (camera package %s)" % s["camera_package"] if s["camera_package"] else ""))
+    for n, text in others[:3]:
+        add("warn", "a line fills the log (%d times in the last 20000 lines): %s" % (n, text))
+    if s["newest_log"] and not s["log_repeats"]:
+        add("ok", "no repeating errors in the newest log (%s)" % s["newest_log"].rsplit("/", 1)[-1])
+    elif not s["newest_log"] and s["installed"]:
+        add("ok", "no log yet (the software has not run)")
+    if s["newest_log"] and not loops and s["log_calibrations"]:
+        add("ok", "camera calibration was received (%d time(s) in the newest log)" % s["log_calibrations"])
+    if s["camera_package"]:
+        add("ok", "camera package booster-x5-camera %s" % s["camera_package"])
+
+    version = firmware_version(s["info"])
+    if not version:
+        add("warn", "firmware version not found in /opt/booster/robot_info.txt (tested: %s)" % TESTED_FIRMWARE)
+    elif version == TESTED_FIRMWARE:
+        add("ok", "firmware %s is the tested one" % version)
+    elif version.startswith("1.8.0"):
+        add("warn", "firmware %s is known to misbehave with this code (tested: %s)" % (version, TESTED_FIRMWARE))
+    else:
+        add("warn", "firmware %s has not been tested with this code (tested: %s)" % (version, TESTED_FIRMWARE))
+
+    if not s["sudo_systemctl"]:
+        add("warn", "'sudo -n /bin/systemctl' is not allowed: bh reboot, bh shutdown and the installer need it")
+    return checks
+
+
+def verdict(checks: List[tuple]) -> str:
+    failed = sum(1 for level, _ in checks if level == "fail")
+    warned = sum(1 for level, _ in checks if level == "warn")
+    if failed:
+        return "VERDICT: the software will NOT run properly (%d failed, %d warnings)" % (failed, warned)
+    if warned:
+        return "VERDICT: should run, but check the %d warning(s) above" % warned
+    return "VERDICT: ready to run"
 
 
 def scan(target: Target, password: bool = False) -> dict:
@@ -120,8 +271,6 @@ def print_scan(target: Target, s: dict) -> int:
     say("Robot at %s (hostname %s)" % (target.ip, s["host"] or "?"))
     for line in s["info"]:
         say("    " + line.strip())
-    if any("1.8." in line for line in s["info"]):
-        core.warn("this looks like firmware 1.8.x - the code is tested with 1.7.1 and 1.8.0 is known to misbehave")
     if s["installed"]:
         core.ok("this code's start scripts are installed" + (", software deployed" if s["deployed"] else ", nothing deployed yet"))
     else:
@@ -169,7 +318,12 @@ def print_scan(target: Target, s: dict) -> int:
         issues += 1
     if not issues:
         core.ok("nothing found that would interfere with this code")
-    return issues
+    say("Will it run? (what the software needs while it runs)")
+    checks = will_it_run(s)
+    for level, text in checks:
+        {"ok": core.ok, "warn": core.warn, "fail": core.warn}[level]("%s%s" % ("FAIL: " if level == "fail" else "", text))
+    say(verdict(checks))
+    return issues + sum(1 for level, _ in checks if level != "ok")
 
 
 # --------------------------------------------------------------------------

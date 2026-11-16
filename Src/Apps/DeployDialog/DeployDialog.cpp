@@ -337,7 +337,7 @@ void DeployDialog::createProcesses()
             table->setCell(robot.name, column, "");
         else if(Time::getRealTimeSince(robot.lastStatusUpdate) > statusUpdateTime && statusProcess->state() == QProcess::NotRunning)
         {
-          statusProcess->startCommand(remoteCommand(ip, "( cat /var/volatile/tmp/internalState.txt 2>/dev/null || echo '0 0'; "
+          statusProcess->startCommand(remoteCommand(ip, "( cat /var/volatile/tmp/internalState.txt 2>/dev/null || cat /run/user/*/internalState.txt 2>/dev/null || echo '0 0'; "
                                                           "echo -n ' '; "
                                                           "ls /home/TARGET_USER/logs | wc -l; "
                                                           "echo -n ' '; "

@@ -216,6 +216,68 @@ class RobotStatus(unittest.TestCase):
         self.assertFalse(robots.analyse_scan(robots.parse_scan("@host x"))["complete"])
 
 
+class WillItRun(unittest.TestCase):
+    HEALTHY = """@host k
+@info Booster K1;firmware 1.7.1;
+@bhuman yes yes enabled
+@svcactive active
+@svcenabled enabled
+@svcfailed active
+@statedir /var/volatile/tmp no
+@statedir /run/user/1000 yes
+@dir /home/booster/logs yes
+@dir /home/booster/Config yes
+@sudo yes
+@lognew /home/booster/logs/bhumand_(3).log
+@logcalib 1
+@end
+"""
+
+    def checks(self, text):
+        return robots.will_it_run(robots.analyse_scan(robots.parse_scan(text)))
+
+    def test_a_healthy_robot_is_ready(self):
+        checks = self.checks(self.HEALTHY)
+        self.assertEqual([c for c in checks if c[0] != "ok"], [])
+        self.assertEqual(robots.verdict(checks), "VERDICT: ready to run")
+
+    def test_each_finding_is_reported(self):
+        text = (self.HEALTHY.replace("firmware 1.7.1", "firmware 1.8.1.2").replace("enabled\n@svcactive", "no\n@svcactive")
+                .replace("@svcenabled enabled", "@svcenabled disabled").replace("@statedir /run/user/1000 yes", "@statedir /run/user/1000 no")
+                .replace("@sudo yes", "@sudo no").replace("@dir /home/booster/logs yes", "@dir /home/booster/logs no")
+                .replace("@end", "@dropin /home/booster/.config/systemd/user/bhuman.service.d/controls.conf\n"
+                                 "@dropinline /home/booster/.config/systemd/user/bhuman.service.d/controls.conf ExecStartPre=sudo x\n"
+                                 "@campkg 1.0.2\n"
+                                 "@logrep 19000 12:00:00 [cam_stream_receiver] unexpected calib size 858 (expected 490) - resyncing\n"
+                                 "@logrep 900 something else repeats\n@end"))
+        checks = self.checks(text)
+        levels = {level: " | ".join(t for l, t in checks if l == level) for level in ("ok", "warn", "fail")}
+        self.assertIn("camera stream is stuck in a loop: 19000 times", levels["fail"])
+        self.assertIn("1.0.2", levels["fail"])                                   # the camera package is named
+        self.assertIn("not writable", levels["fail"])
+        self.assertIn("sudo", levels["fail"])
+        self.assertIn("bhuman.service is disabled", levels["warn"])
+        self.assertIn("no writable directory for the status file", levels["warn"])
+        self.assertIn("something else repeats", levels["warn"])
+        self.assertIn("has not been tested", levels["warn"])
+        self.assertIn("will NOT run", robots.verdict(checks))
+
+    def test_firmware_is_read_from_the_robot_info(self):
+        self.assertEqual(robots.firmware_version(["Booster K1", "firmware 1.7.1"]), "1.7.1")
+        self.assertEqual(robots.firmware_version(["Version: 1.8.1.2"]), "1.8.1.2")
+        self.assertEqual(robots.firmware_version(["Booster K1"]), "")
+
+    def test_the_status_file_is_looked_for_where_the_software_writes_it(self):
+        # InternalStateProvider.cpp, DeployDialog.cpp and bh status must agree on the places.
+        for source in ("Src/Modules/Infrastructure/RobotHealthProvider/InternalStateProvider.cpp",
+                       "Src/Apps/DeployDialog/DeployDialog.cpp"):
+            text = (REPO / source).read_text()
+            for part in ("/var/volatile/tmp", "/run/user/", "internalState.txt"):
+                self.assertIn(part, text, (part, source))
+        for part in ("/var/volatile/tmp/internalState.txt", "/run/user/*/internalState.txt"):
+            self.assertIn(part, remote.STATUS_SCRIPT)
+
+
 class Guard(unittest.TestCase):
     def test_guard_can_be_armed_in_every_shipped_thread_configuration(self):
         files = sorted((REPO / "Config" / "Scenarios").glob("*/*/threads.cfg"))

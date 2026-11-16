@@ -41,7 +41,7 @@ class Flows(unittest.TestCase):
         cls.repo = fakerobot.make_repo(cls.tmp)
         cls.tools = fakerobot.make_local_tools(cls.tmp)
         cls.alice = fakerobot.make_robot(cls.tmp, "Alice", ALICE)
-        cls.bob = fakerobot.make_robot(cls.tmp, "Bob", BOB)
+        cls.bob = fakerobot.make_robot(cls.tmp, "Bob", BOB, volatile=True)
         cls.saved_env = dict(os.environ)
         cls.saved = (core.ROOT, core.tcp_open, core.ssh_key, deploy.build_robot)
         os.environ.update({
@@ -147,6 +147,51 @@ class Flows(unittest.TestCase):
         self.assertIn("old_team/start.sh", out)
         self.assertIn("ONNX Runtime with GPU support", out)
         self.assertIn("start scripts are installed", out)
+
+    def test_03b_scan_says_whether_the_software_can_run(self):
+        # Alice has the layout of a stock Jetson (no /var/volatile), Bob the one the installer creates.
+        out = self.fails("robot", "scan", "Alice")
+        self.assertIn("Will it run?", out)
+        self.assertIn("status file can be written (/run/user/1000)", out)
+        self.assertIn("firmware 1.7.1 is the tested one", out)
+        self.assertNotIn("FAIL:", out)
+        self.assertIn("VERDICT", out)
+        self.assertIn("status file can be written (/var/volatile/tmp)", self.fails("robot", "scan", "Bob"))
+
+    def test_03c_scan_finds_what_stops_a_robot_that_looks_installed(self):
+        # What a robot with another team's build looked like: nothing restarts the software after a
+        # battery change, the status file has no directory, the camera stream is stuck, sudo is not allowed.
+        home = self.alice / "home/booster"
+        loop = home / "logs/bhumand_(2).log"
+        dropin = home / ".config/systemd/user/bhuman.service.d/controls.conf"
+        info = self.alice / "opt/booster/robot_info.txt"
+        saved_state = (self.alice / "run/user/1000/internalState.txt").read_text()
+        saved_info = info.read_text()
+        fakerobot._write(loop, "".join("12:00:%02d [cam_stream_receiver] unexpected calib size 858 (expected 490)"
+                                       " - resyncing\n" % (i % 60) for i in range(400)))
+        fakerobot._write(dropin, "[Service]\nExecStartPre=sudo /usr/local/sbin/bhuman-control-routing bhuman\n"
+                                 "TimeoutStartSec=600\n")
+        fakerobot._write(self.alice / "service.enabled", "disabled\n")
+        fakerobot._write(self.alice / "nosudo", "")
+        fakerobot._write(info, "Booster K1\nfirmware 1.8.1.2\n")
+        shutil.rmtree(self.alice / "run")
+        try:
+            out = self.fails("robot", "scan", "Alice")
+            self.assertIn("FAIL: camera stream is stuck in a loop: 400 times", out)
+            self.assertIn("unexpected calib size 858 (expected 490)", out)
+            self.assertIn("bhuman.service is disabled", out)
+            self.assertIn("controls.conf: ExecStartPre=sudo /usr/local/sbin/bhuman-control-routing bhuman", out)
+            self.assertIn("FAIL: ", out.split("controls.conf", 1)[1])         # sudo before every start, sudo not allowed
+            self.assertIn("no writable directory for the status file", out)
+            self.assertIn("firmware 1.8.1.2 has not been tested", out)
+            self.assertIn("VERDICT: the software will NOT run properly", out)
+            stats = {s["name"]: s for s in json.loads(self.ok("status", "--json"))}
+            self.assertIsNone(stats["Alice"]["battery"])                      # what the dashboard showed
+        finally:
+            for path in (loop, dropin, self.alice / "service.enabled", self.alice / "nosudo"):
+                path.unlink()
+            fakerobot._write(info, saved_info)
+            fakerobot._write(self.alice / "run/user/1000/internalState.txt", saved_state)
 
     def test_04_quarantine_and_undo(self):
         log = self.alice / "systemctl.log"

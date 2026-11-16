@@ -26,7 +26,7 @@ cd /home/booster 2>/dev/null
 h=$(hostname)
 echo "@host $h"
 echo "@service $(systemctl --user is-active bhuman.service 2>/dev/null)"
-echo "@internal $(cat /var/volatile/tmp/internalState.txt 2>/dev/null)"
+echo "@internal $({ cat /var/volatile/tmp/internalState.txt 2>/dev/null || cat /run/user/*/internalState.txt 2>/dev/null; } | head -n 1)"
 for z in /sys/devices/virtual/thermal/thermal_zone*/temp; do [ -r "$z" ] && echo "@zone $(cat "$z")"; done
 echo "@disk $(df -Pk /home/booster 2>/dev/null | awk 'NR==2 {print $4, $5}')"
 echo "@logs $(ls logs 2>/dev/null | wc -l)"

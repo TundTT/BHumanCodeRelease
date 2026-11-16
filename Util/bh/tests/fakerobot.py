@@ -37,7 +37,7 @@ with open(root + "/ssh.log", "a") as f:
     f.write(command + "\n")
 if not command:
     sys.exit(0)
-MOUNTS = ("/home/booster", "/var/volatile/tmp", "/opt/booster", "/sys/devices/virtual/thermal")
+MOUNTS = ("/home/booster", "/var/volatile/tmp", "/run/user", "/opt/booster", "/sys/devices/virtual/thermal")
 def to_fake(text):
     # Paths that already point into the robot tree (results of earlier commands) stay as they are.
     # (Recognised by the directory name, because Git Bash spells the same directory differently.)
@@ -140,7 +140,7 @@ state="$FAKE_ROBOT_ROOT/service.state"
 case "$1" in
   is-active) cat "$state" 2>/dev/null || echo inactive; [ "$(cat "$state" 2>/dev/null)" = active ];;
   is-failed) echo inactive; exit 1;;
-  is-enabled) echo enabled;;
+  is-enabled) cat "$FAKE_ROBOT_ROOT/service.enabled" 2>/dev/null || echo enabled;;
   start|restart) echo active >"$state";;
   stop) echo inactive >"$state";;
   list-unit-files) cat "$FAKE_ROBOT_ROOT/units.enabled" 2>/dev/null;;
@@ -217,8 +217,12 @@ def make_repo(tmp: Path) -> Path:
     return root
 
 
-def make_robot(tmp: Path, name: str, ip: str) -> Path:
-    """Create the directory tree that stands in for the robot at ``ip``."""
+def make_robot(tmp: Path, name: str, ip: str, volatile: bool = False) -> Path:
+    """Create the directory tree that stands in for the robot at ``ip``.
+
+    The default is a stock NVIDIA Jetson Ubuntu as found on robots that were not set up by Install/: there
+    is no /var/volatile, only /run/user/1000 (the home of the user's systemd session). ``volatile=True``
+    gives the layout the installer creates (/var/volatile/tmp)."""
     root = tmp / "robots" / ip
     home = root / "home" / "booster"
     for stub in ("setprofile", "setvolume", "bhuman"):
@@ -229,7 +233,11 @@ def make_robot(tmp: Path, name: str, ip: str) -> Path:
     capi = home / ".local" / "lib" / "python3.10" / "site-packages" / "onnxruntime" / "capi"
     for lib in ("libonnxruntime.so.1.22.0", "libonnxruntime_providers_tensorrt.so", "libonnxruntime_providers_shared.so"):
         _write(capi / lib, "lib")
-    _write(root / "var" / "volatile" / "tmp" / "internalState.txt", "0.83 47")
+    if volatile:
+        _write(root / "var" / "volatile" / "tmp" / "internalState.txt", "0.83 47")
+    else:
+        _write(root / "run" / "user" / "1000" / "internalState.txt", "0.83 47")
+        _write(root / "etc" / "nv_tegra_release", "# R36 (release), REVISION: 4.3\n")
     _write(root / "opt" / "booster" / "robot_info.txt", "Booster K1\nfirmware 1.7.1\n")
     _write(root / "opt" / "booster" / "config" / "containerd" / "config.yaml",
            "- name: ros.camera\n  enable: true\n- name: motion\n  enable: true\n- name: lui\n  enable: false\n")
@@ -240,7 +248,8 @@ def make_robot(tmp: Path, name: str, ip: str) -> Path:
     _script(root / "bin" / "hostname", "#!/bin/bash\necho %s\n" % name)
     _script(root / "bin" / "systemctl", SYSTEMCTL)
     _script(root / "bin" / "crontab", CRONTAB)
-    _script(root / "bin" / "sudo", '#!/bin/bash\n[ "$1" = "-n" ] && shift\nexec "$@"\n')
+    _script(root / "bin" / "sudo", '#!/bin/bash\n[ "$1" = "-n" ] && shift\n[ "$1" = "-l" ] && { [ -e "$FAKE_ROBOT_ROOT/nosudo" ] && exit 1; exit 0; }\nexec "$@"\n')
+    _script(root / "bin" / "id", '#!/bin/bash\n[ "$1" = "-u" ] && echo 1000 || echo "uid=1000(booster)"\n')
     return root
 
 

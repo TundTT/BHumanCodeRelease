@@ -54,6 +54,26 @@ Then calibrate it ([calibration.md](calibration.md)) before it plays.
 
 Use `--password` for a robot that does not have the team key yet.
 
+### "Will it run?" - what the software needs while it runs
+
+The end of every scan answers whether the software can actually run on this robot, each line `ok`, a warning
+or `FAIL:`, and ends with a verdict line (`ready to run`, `should run, but check ...`, or `will NOT run
+properly`). A robot can have everything installed and still not run; these are the cases the scan names:
+
+| Finding | What it means |
+|---|---|
+| `bhuman.service is disabled` (or not known to systemd) | nothing starts the software after a reboot or a battery change; `systemctl --user enable bhuman` |
+| `bhuman.service has failed` | look at `systemctl --user status bhuman` and the newest log |
+| `bhuman.service is changed by <drop-in>` | another file adds `ExecStartPre`/`ExecStopPost`/timeouts to the service; they run at every start, so read them. With `sudo` in them and no `sudo -n` allowed this is a `FAIL` |
+| no writable directory for the status file | the software writes battery and temperature to `/var/volatile/tmp` (made by the installer) or `/run/user/<uid>`; if neither is writable, `bh status` and the dashboard show the battery as unknown |
+| `~/logs` or `~/Config` not writable / missing | the software cannot write its logs or configuration |
+| `camera stream is stuck in a loop` | the newest log is full of `[cam_stream_receiver] unexpected calib size X (expected 490) - resyncing`. The receiver on the Orin (`Util/X5Camera/include/cam_stream_receiver.cpp`) expects a calibration packet of exactly 490 bytes and the program on the X5 camera board sent another size; there is no version field, so both sides must come from the same version (`update_x5` installs the matching camera stack). Without a calibration there are no images |
+| a line repeats hundreds of times in the log | something fails in a loop; the line is shown |
+| firmware other than 1.7.1 | not tested with this code (1.8.0 is known to misbehave) |
+| `sudo -n /bin/systemctl` not allowed | `bh reboot`, `bh shutdown` and the installer need it |
+
+The scan only reads; it changes nothing on the robot.
+
 ## Switching off other software without destroying it
 
 ```bash
