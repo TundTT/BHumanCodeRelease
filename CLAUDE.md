@@ -171,13 +171,14 @@ motion code, leave it and write down what you found.
 | `doctor.py` | `doctor`, `setup`, `test` |
 | `deploy.py` | `deploy`, `match`, `build`, `generate`; calibration rescue, guard arming, verification |
 | `robots.py` | `robot list/add/remove/scan/install/quarantine/onboard` |
+| `share.py` | `robot claim/release/backup/backups/restore`; the claim check of `deploy`, `policy push`, `restore` |
 | `remote.py` | `status`, `stop`, `start`, `restart`, `logs`, `ssh`, `reboot`, `shutdown` |
 | `guard.py` | `guard` (heartbeat to `EmergencyButtonProvider`, UDP 9910) |
 | `policy.py`, `onnxinfo.py` | `policy list/check/info/use/push`; ONNX shapes without onnx/protobuf packages |
 | `calib.py` | `calib status/pull` |
 | `gamecontroller.py` | `gc doctor/listen/test`; protocol encode/decode |
 | `sim.py` | `sim`, `connect`, `eval` |
-| `dash.py`, `dash.html` | `dash` |
+| `dash.py`, `dash.html` | `dash`: page, background jobs (`core.capture_output` sends their output to the page), uploads, per-robot guard heartbeats |
 
 Rules:
 

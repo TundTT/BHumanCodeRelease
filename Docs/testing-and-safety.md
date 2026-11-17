@@ -81,8 +81,9 @@ Limits you should know:
 - It is a software stop over the network. It does not replace the F1 button or a person next to the robot.
 - A guarded robot that nobody releases never moves. If a robot "does nothing", check `bh status`.
 
-`bh dash --guard` offers the same switch as buttons; there the robots also stop when the browser tab is
-closed.
+The dashboard offers the same switch as buttons: **RUN** / **STOP** on the card of a robot deployed with
+the guard starts a heartbeat for that robot only (`bh dash --guard`: for all robots at once). There the
+robots also stop when the browser tab is closed.
 
 ## Watching a test
 

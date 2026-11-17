@@ -284,6 +284,77 @@ class WillItRun(unittest.TestCase):
             self.assertIn(part, remote.STATUS_SCRIPT)
 
 
+class LEDReport(unittest.TestCase):
+    """The robot software reports its back LED (InternalStateProvider) and bh dash shows it."""
+
+    def test_the_report_is_read_where_and_how_the_software_writes_it(self):
+        src = (REPO / "Src/Modules/Infrastructure/RobotHealthProvider/InternalStateProvider.cpp").read_text()
+        self.assertIn('"/ledState.txt"', src)
+        order = re.findall(r"leds\.ledStates\[LEDRequest::(\w+)\]", src)
+        self.assertEqual(order, ["red", "green", "blue"])
+        for part in ("/var/volatile/tmp/ledState.txt", "/run/user/*/ledState.txt"):
+            self.assertIn(part, remote.STATUS_SCRIPT)
+
+    def test_state_numbers_match_the_enum(self):
+        header = (REPO / "Src/Representations/Infrastructure/LEDRequest.h").read_text()
+        block = re.search(r"ENUM\(State,\s*\{,(.*?)\}\);", header, re.S).group(1)
+        self.assertEqual(tuple(re.findall(r"(\w+),", block)), remote.LED_STATES)
+        leds = re.search(r"ENUM\(LED,\s*\{,(.*?)\}\);", header, re.S).group(1)
+        self.assertEqual(re.findall(r"(\w+),", leds), ["red", "green", "blue"])
+
+    def test_parse(self):
+        self.assertEqual(remote.parse_led_report(["100", "0", "1", "2"], 112),
+                         {"red": "off", "green": "on", "blue": "blinking", "age_s": 12})
+        for bad in ([], ["100", "0", "1"], ["100", "0", "1", "7"], ["x", "0", "1", "2"]):
+            self.assertIsNone(remote.parse_led_report(bad, 112), bad)
+        status = remote.parse_status("@now 1000\n@ledstate 990 1 1 0\n@claim Dana\t5000\t900\tkick test\n@end\n")
+        self.assertEqual(status["led_report"]["age_s"], 10)
+        self.assertEqual((status["claim"]["who"], status["claim"]["note"], status["claim"]["age_s"]), ("Dana", "kick test", 100))
+        self.assertIsNone(remote.parse_status("@claim \n@end\n")["claim"])
+
+    def test_every_colour_is_explained_with_the_legend(self):
+        from bhtool import dash
+        names = [name for name, _ in dash.LED_LEGEND]
+        for levels, colour in dash.LED_COLOURS.items():
+            if colour == "blue":                   # only shown blinking (limp) or as a short flash
+                continue
+            self.assertIn(colour, names)
+            states = ["off", "half", "on"]
+            report = dict(zip(("red", "green", "blue"), (states[v] for v in levels)), age_s=0)
+            self.assertEqual(dash.describe_led(report)["meaning"], dash.legend(colour), colour)
+        limp = dash.describe_led({"red": "off", "green": "off", "blue": "blinking"})
+        self.assertEqual((limp["meaning"], limp["blink"], limp["rgb_off"]), (dash.legend("blue, blinking"), "slow", [0, 0, 0]))
+        busy = dash.describe_led({"red": "fastBlinking", "green": "halfFastBlinking", "blue": "off"})
+        self.assertEqual(busy["meaning"], dash.legend("any colour, fast blinking"))
+        remote_control = dash.describe_led({"red": "off", "green": "blinking", "blue": "off"})
+        self.assertIn(dash.legend("any colour, slow blinking"), remote_control["meaning"])
+        self.assertIn("playing", remote_control["meaning"])
+        self.assertIn("does not show on its own", dash.describe_led({"red": "off", "green": "off", "blue": "on"})["meaning"])
+        self.assertIsNone(dash.describe_led(None))
+
+
+class Sharing(unittest.TestCase):
+    def test_claims(self):
+        from bhtool import share
+        claim = share.parse_claim("Dana\t2000\t1000\tintercept test", 1500)
+        self.assertEqual((claim["who"], claim["expired"], claim["age_s"], claim["left_s"]), ("Dana", False, 500, 500))
+        self.assertTrue(share.parse_claim("Dana\t2000\t1000\t", 2001)["expired"])
+        for bad in ("", "Dana", "\t2000\t1000", "Dana\tsoon\t1000"):
+            self.assertIsNone(share.parse_claim(bad, 1500), bad)
+        self.assertEqual(share.clean("Dana's \"build\"; rm -rf /\n", 80), "Danas build rm -rf")
+        self.assertEqual(share.clean("x" * 100, 40), "x" * 40)
+
+    def test_names_that_reach_the_robot_or_the_disk_are_plain(self):
+        from bhtool import dash, share
+        for good in ("20261117-140233",):
+            self.assertTrue(share.BACKUP_ID.match(good))
+        for bad in ("../x", "20261117-140233; rm", "latest"):
+            self.assertIsNone(share.BACKUP_ID.match(bad))
+        self.assertTrue(dash.UPLOAD_NAME.match("K1_walk-v2.onnx"))
+        for bad in ("../K1.onnx", "a/b.onnx", "x.onnx.exe", ".onnx", "a b.onnx"):
+            self.assertIsNone(dash.UPLOAD_NAME.match(bad), bad)
+
+
 class Guard(unittest.TestCase):
     def test_guard_can_be_armed_in_every_shipped_thread_configuration(self):
         files = sorted((REPO / "Config" / "Scenarios").glob("*/*/threads.cfg"))

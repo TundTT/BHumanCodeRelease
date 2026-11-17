@@ -15,7 +15,8 @@ Everything you do day to day goes through one command, `bh`, run from the reposi
 | run a game in the simulator | [simulation.md](simulation.md) | `bh sim` |
 | calibrate a robot, close the sim-to-real gap | [calibration.md](calibration.md) | `bh calib status` |
 | connect to the GameController | [game-controller.md](game-controller.md) | `bh gc doctor` |
-| see what the robots are doing | [dashboard.md](dashboard.md) | `bh dash` |
+| see what the robots are doing, and click instead of type | [dashboard.md](dashboard.md) | `bh dash` |
+| take turns on robots others use too | [sharing-robots.md](sharing-robots.md) | `bh robot claim NAME --note "..."` |
 | read the LED on the robot's back | [leds.md](leds.md) | |
 | play a real match | [match-day.md](match-day.md) | `bh match alice:1 bob:2 --profile HSL_A` |
 | change the code (people and coding agents) | [../CLAUDE.md](../CLAUDE.md) | `bh test` |

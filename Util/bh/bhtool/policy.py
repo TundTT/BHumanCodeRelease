@@ -13,7 +13,7 @@ import shutil
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Optional
 
-from . import core, onnxinfo
+from . import core, onnxinfo, share
 from .core import BhError, say
 
 
@@ -311,6 +311,7 @@ def cmd_push(args) -> int:
             say("    " + r[len(core.REMOTE_CONFIG) + 1:])
         if args.dry_run:
             continue
+        share.respect_claim(t, getattr(args, "ignore_claim", False))
         if not args.yes and not core.confirm(
                 "Restarting makes the robot go limp for a moment. Is %s sitting or held?" % t.label):
             say("skipped %s" % t.label)
@@ -366,4 +367,6 @@ def add_parser(sub) -> None:
     q.add_argument("robots", nargs="+", metavar="robot")
     q.add_argument("--dry-run", action="store_true", help="only show what would be sent")
     q.add_argument("-y", "--yes", action="store_true", help="do not ask before restarting")
+    q.add_argument("--ignore-claim", action="store_true",
+                   help="push although somebody else marked the robot as in use (bh robot claim)")
     q.set_defaults(func=cmd_push)

@@ -19,11 +19,13 @@ new robot         bh robot onboard NAME --id N      register + inspect + install
 every day         bh deploy NAME            build, copy, verify, start
                   bh status                 battery, temperature, state of all robots
                   bh logs NAME -f           follow what the robot says
-                  bh dash                   live dashboard in the browser
+                  bh dash                   the same with buttons: deploy, policies, guard, LEDs
                   bh connect NAME           full mission control (SimRobot attached)
 safety            bh deploy NAME --guard    robot moves only while 'bh guard' runs
                   bh guard                  dead-man switch (ENTER = run/stop)
                   bh stop                   HARD STOP all robots (they go limp)
+shared robots     bh robot claim NAME --note "..."   tell others you use it; release when done
+                  bh deploy NAME --backup   keep what was there; bh robot restore NAME puts it back
 policies          bh policy list            which networks are used, do they fit
                   bh policy use walk FILE --model k1 --scope sim
                   bh policy push NAME       send only the policies, restart

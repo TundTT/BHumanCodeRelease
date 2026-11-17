@@ -13,7 +13,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from . import core
+from . import core, share
 from .core import BhError, Target, say
 
 # Limits taken from Config/Robots/Default/*/boosterProvider.cfg and robotHealthProvider.cfg.
@@ -41,6 +41,11 @@ echo "@binary $(stat -c %Y Config/bhuman 2>/dev/null)"
 echo "@now $(date +%s)"
 echo "@guard $([ -e "Config/Robots/$h/threads.cfg" ] && echo yes || echo no)"
 echo "@led $(sed -n 's/^mode *= *\([A-Za-z]*\).*/\1/p' Config/Scenarios/Default/ledHandler.cfg 2>/dev/null | head -1)"
+echo "@claim $(head -n 1 .bh-claim 2>/dev/null)"
+echo "@backups $(ls .bh-backups/*.info 2>/dev/null | wc -l)"
+for f in /var/volatile/tmp/ledState.txt /run/user/*/ledState.txt; do
+  [ -r "$f" ] && { echo "@ledstate $(stat -c %Y "$f") $(head -n 1 "$f")"; break; }
+done
 echo "@model $(grep -o 'Booster [A-Z0-9]*' /opt/booster/robot_info.txt 2>/dev/null | head -1)"
 f=$(ls -t logs/bhumand_*.log 2>/dev/null | head -1)
 [ -n "$f" ] && tail -n 6 "$f" | sed 's/^/@log /'
@@ -55,9 +60,26 @@ def _num(text: str) -> Optional[float]:
         return None
 
 
+# The values of LEDRequest::State (Src/Representations/Infrastructure/LEDRequest.h), in that order. The robot
+# software writes the three states of the back LED (red, green, blue) as numbers; a test compares the order.
+LED_STATES = ("off", "on", "blinking", "fastBlinking", "half", "halfBlinking", "halfFastBlinking")
+LED_REPORT_MAX_AGE = 20            # the robot rewrites the file at least every 5 s while the software runs
+
+
+def parse_led_report(parts: Sequence[str], robot_time: Optional[int]) -> Optional[dict]:
+    """What the robot software last reported about its back LED: ``{"red": state, "green": state,
+    "blue": state, "age_s": seconds}`` or None if there is no (valid) report."""
+    if len(parts) != 4 or not all(p.isdigit() for p in parts) or any(int(p) >= len(LED_STATES) for p in parts[1:]):
+        return None
+    report: dict = {name: LED_STATES[int(p)] for name, p in zip(("red", "green", "blue"), parts[1:])}
+    report["age_s"] = max(0, robot_time - int(parts[0])) if robot_time is not None else None
+    return report
+
+
 def parse_status(output: str) -> dict:
     """Turn the output of STATUS_SCRIPT into a dictionary."""
     s: dict = {"zones": [], "log": [], "complete": False}
+    claim, led_report = "", []
     for line in output.splitlines():
         if not line.startswith("@"):
             continue
@@ -115,8 +137,17 @@ def parse_status(output: str) -> dict:
             s["led"] = value or None
         elif key == "model":
             s["hardware"] = value or None
+        elif key == "claim":
+            claim = value
+        elif key == "backups":
+            s["backups"] = int(value) if value.isdigit() else 0
+        elif key == "ledstate":
+            led_report = value.split()
         elif key == "log":
             s["log"].append(value)
+    # Both depend on the robot's clock, which is reported on another line.
+    s["claim"] = share.parse_claim(claim, s.get("robot_time"))
+    s["led_report"] = parse_led_report(led_report, s.get("robot_time"))
     return s
 
 
@@ -195,16 +226,18 @@ def assess(s: dict) -> List[Tuple[str, str]]:
 def describe(s: dict) -> List[str]:
     """One row for the status table."""
     if not s.get("reachable"):
-        return [s["name"], s["ip"], "OFFLINE", "-", "-", "-", "-", s.get("error") or ""]
+        return [s["name"], s["ip"], "OFFLINE", "-", "-", "-", "-", "-", s.get("error") or ""]
     cfg = s.get("settings") or {}
     zones = s.get("zones") or []
     problems = [text for level, text in assess(s) if level != "ok"]
+    claim = s.get("claim")
     return [s["name"], s["ip"], s.get("service", "?"),
             "%d%%" % s["battery"] if s.get("battery") is not None else "?",
             ("%d C" % s["max_temp"] if s.get("max_temp") is not None else "?")
             + (" / %.0f C" % max(zones) if zones else ""),
             "t%s p%s" % (cfg.get("teamNumber", "?"), cfg.get("playerNumber", "?")),
             "%s/%s" % (cfg.get("scenario", "?"), cfg.get("location", "?")),
+            share.describe_claim(claim) if claim and not claim["expired"] else "-",
             "; ".join(problems) if problems else "ok"]
 
 
@@ -219,7 +252,8 @@ def cmd_status(args) -> int:
         say(json.dumps(stats, indent=2))
     else:
         say(core.table([describe(s) for s in stats],
-                       ["robot", "address", "software", "battery", "joint / cpu", "team player", "scenario/location", "notes"]))
+                       ["robot", "address", "software", "battery", "joint / cpu", "team player", "scenario/location",
+                        "in use by", "notes"]))
     return 0 if all(s.get("reachable") for s in stats) else 1
 
 

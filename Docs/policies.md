@@ -60,6 +60,9 @@ send anything while `bh policy check` fails.
 
 Going back is the same command with the old file name, or `git checkout` of the changed `.cfg` files.
 
+The same steps without typing: the **Policies** tab of `bh dash` - drop the file, drag it onto a slot, try it
+in the simulator, send it to a robot ([dashboard.md](dashboard.md)).
+
 ## When the sizes differ
 
 A policy trained with a different observation or action layout cannot be dropped in. The observation vector

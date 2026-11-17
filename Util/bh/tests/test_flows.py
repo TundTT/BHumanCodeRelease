@@ -306,6 +306,98 @@ class Flows(unittest.TestCase):
         self.assertEqual(on_robot.read_bytes(), original)
         self.assertEqual(self.service(self.alice), "active")
 
+    def test_09b_sharing_a_robot(self):
+        """Somebody is using the robot: others are told so, and what was on it can be put back."""
+        home = self.alice / "home" / "booster"
+        cfg = self.robot_cfg(self.alice)
+        out = self.ok("robot", "claim", "Alice", "--as", "Dana", "--note", "walk 'test'")
+        self.assertIn("in use by Dana", out)
+        self.assertTrue((home / ".bh-claim").read_text().startswith("Dana\t"))
+        self.assertIn("Dana", self.ok("status", "Alice"))
+        status = json.loads(self.ok("status", "Alice", "--json"))[0]
+        self.assertEqual((status["claim"]["who"], status["claim"]["note"], status["claim"]["expired"]),
+                         ("Dana", "walk test", False))
+        self.ok("robot", "claim", "Alice", "--as", "dana", "--note", "walk test")     # renewing one's own claim
+        os.environ["BH_USER"] = "Eve"
+        try:
+            binary = (cfg / "bhuman").read_bytes()
+            fakerobot._write(deploy.binary_path("Develop"), "Eve's build\n")
+            out = self.fails("deploy", "Alice", "--no-build")
+            self.assertIn("in use by dana", out)
+            self.assertIn("walk test", out)
+            self.assertEqual((cfg / "bhuman").read_bytes(), binary)
+            self.assertEqual(self.service(self.alice), "active")
+            self.assertIn("already in use by dana", self.fails("robot", "claim", "Alice"))
+            self.assertIn("not by you", self.fails("robot", "release", "Alice"))
+            self.assertIn("in use by dana", self.fails("robot", "restore", "Alice", "-y"))
+            walk_cfg = core.find_config("walkingEngine.cfg", "k1")
+            name = core.cfg_get(core.read_cfg(walk_cfg), "walkNeuronalNetworkParameters.modelName")
+            on_robot = cfg / "NeuralNets" / "Walk" / name
+            original = on_robot.read_bytes()
+            on_robot.write_bytes(b"dana's policy")
+            self.assertIn("in use by dana", self.fails("policy", "push", "Alice", "-y"))
+            self.assertEqual(on_robot.read_bytes(), b"dana's policy")
+            self.assertEqual(self.service(self.alice), "active")
+            self.ok("policy", "push", "Alice", "--dry-run")                          # looking is always allowed
+            on_robot.write_bytes(original)
+            self.ok("stop", "Alice")                                                 # a stop never asks who owns it
+            self.assertIn("continuing anyway", self.ok("deploy", "Alice", "--no-build", "--ignore-claim"))
+            self.assertEqual((cfg / "bhuman").read_text(), "Eve's build\n")
+            self.assertTrue((home / ".bh-claim").exists())                           # a deploy does not remove it
+            # A claim that nobody released ends by itself.
+            (home / ".bh-claim").write_text("Dana\t%d\t%d\tforgotten\n" % (time.time() - 60, time.time() - 9 * 3600))
+            self.ok("deploy", "Alice", "--no-build", "--dry-run")
+            self.ok("robot", "claim", "Alice", "--hours", "1")
+            self.assertTrue((home / ".bh-claim").read_text().startswith("Eve\t"))
+            self.assertIn("free again", self.ok("robot", "release", "Alice"))
+            self.assertFalse((home / ".bh-claim").exists())
+            self.assertIn("was not marked", self.ok("robot", "release", "Alice"))
+        finally:
+            del os.environ["BH_USER"]
+        # Backup, replace, restore.
+        unit = home / ".config" / "systemd" / "user" / "bhuman.service"
+        fakerobot._write(unit, "their unit\n")
+        fakerobot._write(cfg / "teammate.cfg", "their work\n")
+        out = self.ok("robot", "backup", "Alice", "--label", "Dana's build", "--as", "Dana")
+        self.assertIn("bh robot restore Alice", out)
+        first = sorted(p.stem for p in (home / ".bh-backups").glob("*.tar"))[0]
+        listing = self.ok("robot", "backups", "Alice")
+        self.assertIn(first, listing)
+        self.assertIn("Danas build", listing)
+        self.assertEqual(json.loads(self.ok("status", "Alice", "--json"))[0]["backups"], 1)
+        fakerobot._write(deploy.binary_path("Develop"), "my experiment\n")
+        out = self.ok("deploy", "Alice", "--no-build", "--backup")                   # a second one, on the way
+        self.assertIn("Backing up", out)
+        self.assertEqual(len(list((home / ".bh-backups").glob("*.tar"))), 2)
+        self.assertFalse((cfg / "teammate.cfg").exists())                            # the deploy replaced Config
+        fakerobot._write(unit, "my unit\n")
+        fakerobot._write(unit.parent / "bhuman.service.d" / "mine.conf", "[Service]\n")
+        self.assertEqual(self.service(self.alice), "active")
+        self.fails("robot", "restore", "Alice", first)                               # asks first; no terminal = no
+        self.assertFalse((cfg / "teammate.cfg").exists())
+        self.assertIn("is not a backup id", self.fails("robot", "restore", "Alice", "../../etc", "-y"))
+        self.assertIn("does not exist", self.fails("robot", "restore", "Alice", "20200101-000000", "-y"))
+        self.assertEqual(self.service(self.alice), "active")
+        self.assertIn("back in place", self.ok("robot", "restore", "Alice", first, "-y"))
+        self.assertEqual((cfg / "teammate.cfg").read_text(), "their work\n")
+        self.assertEqual((cfg / "bhuman").read_text(), "Eve's build\n")
+        self.assertEqual(unit.read_text(), "their unit\n")
+        self.assertFalse((unit.parent / "bhuman.service.d" / "mine.conf").exists())
+        self.assertEqual(self.service(self.alice), "inactive")                       # stopped, and not started again
+        self.assertFalse(list((home / ".bh-backups").glob("replaced.*")))
+        # A damaged backup is refused before anything is touched.
+        newest = sorted((home / ".bh-backups").glob("*.tar"))[-1]
+        newest.write_bytes(b"not an archive")
+        self.assertIn("cannot be read", self.fails("robot", "restore", "Alice", "-y"))
+        self.assertEqual((cfg / "teammate.cfg").read_text(), "their work\n")
+        for backup in sorted(p.stem for p in (home / ".bh-backups").glob("*.tar")):
+            self.ok("robot", "backups", "Alice", "--delete", backup)
+        self.assertIn("no backups", self.ok("robot", "backups", "Alice"))
+        self.assertIn("has no backup", self.fails("robot", "restore", "Alice", "-y"))
+        unit.unlink()
+        fakerobot._write(deploy.binary_path("Develop"), "fake robot binary (Develop)\n")
+        self.ok("deploy", "Alice", "--no-build")
+
     def test_10_service_control_and_logs(self):
         self.ok("stop", "Alice")
         self.assertEqual(self.service(self.alice), "inactive")
@@ -432,9 +524,109 @@ class Flows(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as e:
                 post({"action": "guard", "released": True, "token": d.token})
             self.assertEqual(e.exception.code, 400)
+
+            # Jobs: the same commands as the command line, with their output in the page.
+            def job(body):
+                answer = post(dict(body, token=d.token))
+                jid = answer["data"]["job"]
+                deadline = time.time() + 120
+                while time.time() < deadline:
+                    out = json.loads(get("/api/job?t=%s&id=%d&since=0" % (d.token, jid)))
+                    if out["state"] != "running":
+                        return out["state"], "\n".join(out["text"])
+                    time.sleep(0.2)
+                self.fail("job %s did not finish" % body)
+
+            os.environ["BH_USER"] = "Dana"
+            d.me = "Dana"
+            try:
+                state, text = job({"action": "claim", "robot": "Alice", "note": "--force me", "hours": 2})
+                self.assertEqual(state, "ok", text)
+                self.assertIn("$ bh robot claim Alice", text)
+                self.assertIn("--force me", (self.alice / "home/booster/.bh-claim").read_text().split("\t")[3])
+                d.poll_now.set()
+                deadline = time.time() + 30
+                while time.time() < deadline:
+                    alice = next(r for r in json.loads(get("/api/state?t=" + d.token))["robots"] if r["name"] == "Alice")
+                    if alice.get("claim"):
+                        break
+                    time.sleep(0.3)
+                self.assertEqual((alice["claim"]["who"], alice["claim"]["mine"]), ("Dana", True))
+                state, text = job({"action": "deploy", "robot": "Alice", "config": "Develop", "dry_run": True})
+                self.assertEqual(state, "ok", text)
+                self.assertIn("Dry run", text)
+                self.assertIn("--no-build", text)
+            finally:
+                os.environ.pop("BH_USER")
+                d.me = "x"
+            state, text = job({"action": "deploy", "robot": "Alice", "dry_run": True})     # somebody else
+            self.assertEqual(state, "failed")
+            self.assertIn("in use by Dana", text)
+            with self.assertRaises(urllib.error.HTTPError) as e:                           # one job per robot
+                post({"action": "scan", "robot": "Alice", "token": d.token})
+                post({"action": "scan", "robot": "Alice", "token": d.token})
+            self.assertIn(b"busy", e.exception.read())
+            deadline = time.time() + 60
+            while time.time() < deadline and any(j["state"] == "running" for j in json.loads(get("/api/state?t=" + d.token))["jobs"]):
+                time.sleep(0.3)
+            state, text = job({"action": "release", "robot": "Alice", "force": True})
+            self.assertEqual(state, "ok", text)
+            self.assertFalse((self.alice / "home/booster/.bh-claim").exists())
+            for bad in ({"action": "deploy", "robot": "Zed"}, {"action": "deploy", "robot": "Alice", "config": "Fast"},
+                        {"action": "deploy", "robot": "Alice", "scenario": "../x"}, {"action": "restore", "robot": "Alice", "backup": "../x"},
+                        {"action": "policy_use", "slot": "walk", "model": "k1", "scope": "sim", "file": "../x.onnx"}):
+                with self.assertRaises(urllib.error.HTTPError) as e:
+                    post(dict(bad, token=d.token))
+                self.assertEqual(e.exception.code, 400, bad)
+
+            # Policies: upload, check the fit, use it for the simulated robot only.
+            def upload(name, data):
+                req = urllib.request.Request("%s/api/upload?t=%s&name=%s" % (base, d.token, name), data=data, method="POST")
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    return json.loads(r.read())
+            walk = core.find_config("walkingEngine.cfg", "k1")
+            current = core.cfg_get(core.read_cfg(walk), "walkNeuronalNetworkParameters.modelName")
+            data = (core.config_dir() / "NeuralNets" / "Walk" / current).read_bytes()
+            for name, body in (("../evil.onnx", data), ("junk.onnx", b"not a network")):
+                with self.assertRaises(urllib.error.HTTPError) as e:
+                    upload(name, body)
+                self.assertEqual(e.exception.code, 400)
+            self.assertFalse((dash.upload_dir() / "junk.onnx").exists())
+            with self.assertRaises(urllib.error.HTTPError) as e:
+                urllib.request.urlopen(urllib.request.Request(base + "/api/upload?t=wrong&name=x.onnx", data=data, method="POST"))
+            self.assertEqual(e.exception.code, 403)
+            info = upload("TestWalk.onnx", data)["data"]
+            self.assertIsNone(info["fits"]["k1"]["walk"])
+            self.assertIn("inputs", info["fits"]["k1"]["kick"])
+            meta = json.loads(get("/api/meta?t=" + d.token))
+            self.assertEqual([u["name"] for u in meta["uploads"]], ["TestWalk.onnx"])
+            self.assertIn("Default", meta["robots"]["Alice"]["walk"])
+            state, text = job({"action": "policy_use", "slot": "kick", "model": "k1", "scope": "sim", "file": "TestWalk.onnx"})
+            self.assertEqual(state, "failed")
+            self.assertIn("expects", text)
+            state, text = job({"action": "policy_use", "slot": "walk", "model": "k1", "scope": "sim", "file": "TestWalk.onnx"})
+            self.assertEqual(state, "ok", text)
+            sim = core.config_dir() / "Robots" / "SimulatedK1" / "walkingEngine.cfg"
+            self.assertEqual(core.cfg_get(core.read_cfg(sim), "walkNeuronalNetworkParameters.modelName"), "TestWalk.onnx")
+            self.assertEqual(core.cfg_get(core.read_cfg(walk), "walkNeuronalNetworkParameters.modelName"), current)
+            k1_walk = next(s for s in json.loads(get("/api/meta?t=" + d.token))["policies"]["models"]["k1"] if s["key"] == "walk")
+            self.assertEqual((k1_walk["sim"], k1_walk["robot"][:1]), (["TestWalk.onnx"], [current]))
+            core.write_exact(sim, core.cfg_replace(core.read_exact(sim), "walkNeuronalNetworkParameters.modelName", current))
+            (core.config_dir() / "NeuralNets" / "Walk" / "TestWalk.onnx").unlink()
         finally:
             server.shutdown()
             server.server_close()
+            d.close()
+
+    def test_14b_passive_dashboard_does_not_touch_robots(self):
+        d = dash.Dashboard(core.resolve_targets([]), interval=1, passive=True, test_gc=None, guard=None)
+        try:
+            ssh_log = (self.alice / "ssh.log").read_text()
+            for kind in ("deploy", "policy_push", "claim", "backup", "restore", "scan", "logs", "stop", "guard_heartbeat"):
+                with self.assertRaises(core.BhError):
+                    d.action({"action": kind, "robot": "Alice"})
+            self.assertEqual((self.alice / "ssh.log").read_text(), ssh_log)
+        finally:
             d.close()
 
 
@@ -499,6 +691,35 @@ class GuardTest(unittest.TestCase):
             time.sleep(3.5)                            # the tab is gone
             self.assertFalse(g.released)
         finally:
+            d.close()
+
+    def test_dashboard_heartbeat_per_robot(self):
+        """The page starts a heartbeat for one robot only when asked; the dead-man applies to it too.
+        (Sent to this computer only: the test must not reach a real robot that has the test's address.)"""
+        saved = guard.guard_ips
+        guard.guard_ips = lambda robots: ["127.0.0.1"]
+        robot = core.Target("127.0.0.1", core.Robot("Alice", "127.0.0.1", "127.0.0.1", "k1"))
+        d = dash.Dashboard([robot], interval=0.3, passive=False, test_gc=None, guard=None)
+        try:
+            self.assertEqual(d.robot_guards, {})                      # nothing is sent before the user asks
+            d.state()
+            d.action({"action": "guard", "robot": "Alice", "released": True})
+            self.assertTrue(d.robot_guards["Alice"].released)
+            time.sleep(0.5)
+            self.drain()
+            self.assertEqual(self.rx.recv(64), b"noemergency\x00")
+            d.last_ui_contact = time.time() - 5                       # the tab is gone
+            d.dead_man()
+            self.assertFalse(d.robot_guards["Alice"].released)
+            time.sleep(0.3)
+            self.drain()
+            self.assertEqual(self.rx.recv(64), b"emergency\x00")
+            d.action({"action": "guard_heartbeat", "robot": "Alice", "on": False})
+            self.assertEqual(d.robot_guards, {})
+            with self.assertRaises(core.BhError):
+                d.action({"action": "guard", "robot": "Zed", "released": True})
+        finally:
+            guard.guard_ips = saved
             d.close()
 
 

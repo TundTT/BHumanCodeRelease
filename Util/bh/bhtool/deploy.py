@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 from typing import List, NamedTuple, Optional, Sequence, Tuple
 
-from . import core, policy, remote
+from . import core, policy, remote, share
 from .core import BhError, Target, say
 
 CALIBRATION_FILE = re.compile(r"^Config/Robots/([A-Za-z0-9_-]+)/(cameraCalibration|imuCalibration)\.cfg$")
@@ -386,10 +386,15 @@ def deploy(jobs: List[Job], args) -> int:
     for job in jobs:
         if not core.tcp_open(job.target.ip, timeout=2):
             raise BhError("%s is not reachable" % job.target.label)
+        share.respect_claim(job.target, getattr(args, "ignore_claim", False))
         rescue(job.target, args.overwrite_calibration, args.cache_sync)
     if args.dry_run:
         say("Dry run: would now deploy %s to %s" % (config, ", ".join(j.target.label for j in jobs)))
         return 0
+    if getattr(args, "backup", False):
+        say("== Backing up what is on the robots now")
+        for job in jobs:
+            share.backup(job.target, "before deploy")
     say("== Copying to %s (robot software stops now - robots go limp)" % ", ".join(j.target.label for j in jobs))
     options = _option_args(args)
     if len(jobs) > 1 and all(j.player is not None for j in jobs):
@@ -478,6 +483,8 @@ def cmd_match(args) -> int:
     args.build = True
     args.restart = True
     args.guard = False          # a normal deploy removes any armed guard
+    args.backup = False
+    args.ignore_claim = True    # a forgotten claim must never keep a robot out of a game; it is only reported
     args.led = "match"
     args.overwrite_calibration = False
     args.cache_sync = True
@@ -544,6 +551,10 @@ def add_parsers(sub) -> None:
                    help="do NOT rescue a calibration that was saved on the robot")
     p.add_argument("--no-cache-sync", dest="cache_sync", action="store_false",
                    help="do not keep inference engines the robot built for itself")
+    p.add_argument("--backup", action="store_true",
+                   help="first snapshot what is on the robot, so that 'bh robot restore' can put it back")
+    p.add_argument("--ignore-claim", action="store_true",
+                   help="deploy although somebody else marked the robot as in use (bh robot claim)")
     _common_deploy_options(p, False)
     p.set_defaults(func=cmd_deploy)
 

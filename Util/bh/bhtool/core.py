@@ -11,8 +11,9 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 from pathlib import Path
-from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple
+from typing import Callable, Dict, List, NamedTuple, Optional, Sequence, Tuple
 
 # Util/bh/bhtool/core.py -> repository root is three levels above this package.
 ROOT = Path(os.environ.get("BH_ROOT") or Path(__file__).resolve().parents[3])
@@ -34,8 +35,40 @@ class BhError(Exception):
 # Output (ASCII only: Windows consoles may not be able to encode more)
 # --------------------------------------------------------------------------
 
+_output = threading.local()
+
+
+def capture_output(sink: Optional[Callable[[str], None]]) -> None:
+    """Send everything this thread prints with say() - and the output of the scripts it runs -
+    to ``sink`` (one call per line) instead of the terminal. ``None`` switches back. The
+    dashboard uses this to show a running deploy in the browser."""
+    _output.sink = sink
+
+
+def output_sink() -> Optional[Callable[[str], None]]:
+    return getattr(_output, "sink", None)
+
+
 def say(msg: str = "") -> None:
-    print(msg, flush=True)
+    sink = output_sink()
+    if sink is not None:
+        for line in str(msg).split("\n"):
+            sink(line)
+    else:
+        print(msg, flush=True)
+
+
+def _call(cmd: Sequence[str], cwd: str) -> int:
+    """Run a program with inherited stdio, or line by line through the output sink of this thread."""
+    sink = output_sink()
+    if sink is None:
+        return subprocess.call(list(cmd), cwd=cwd)
+    p = subprocess.Popen(list(cmd), cwd=cwd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    assert p.stdout is not None
+    for raw in iter(p.stdout.readline, b""):
+        sink(raw.decode("utf-8", "replace").rstrip("\r\n"))
+    p.stdout.close()
+    return p.wait()
 
 
 def ok(msg: str) -> None:
@@ -55,10 +88,11 @@ def note(msg: str) -> None:
 
 
 def confirm(question: str, assume_yes: bool = False) -> bool:
-    """Ask a yes/no question. Without a terminal the answer is always no."""
+    """Ask a yes/no question. Without a terminal the answer is always no - also in a dashboard job,
+    whose output goes to the page (the page asks before it starts the job)."""
     if assume_yes:
         return True
-    if not sys.stdin or not sys.stdin.isatty():
+    if output_sink() is not None or not sys.stdin or not sys.stdin.isatty():
         return False
     try:
         return input(question + " [y/N] ").strip().lower() in ("y", "yes")
@@ -456,7 +490,7 @@ def run_script(script: str, args: Sequence[str] = (), check: bool = True) -> int
     if not (ROOT / script).is_file():
         raise BhError("script %s is missing" % script)
     cmd = bash_prefix() + [script] + [str(a) for a in args]
-    rc = subprocess.call(cmd, cwd=str(ROOT))
+    rc = _call(cmd, str(ROOT))
     if check and rc != 0:
         raise BhError("%s failed (exit code %d)" % (script, rc))
     return rc
@@ -464,7 +498,7 @@ def run_script(script: str, args: Sequence[str] = (), check: bool = True) -> int
 
 def run_bash(command: str, check: bool = True) -> int:
     """Run a bash command line in the repository root with inherited stdio."""
-    rc = subprocess.call(bash_prefix() + ["-c", command], cwd=str(ROOT))
+    rc = _call(bash_prefix() + ["-c", command], str(ROOT))
     if check and rc != 0:
         raise BhError("command failed (exit code %d): %s" % (rc, command))
     return rc

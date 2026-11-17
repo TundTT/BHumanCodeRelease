@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List
 
-from . import core
+from . import core, share
 from .core import BhError, Target, say
 
 # Services of the stock Booster software that Install/Files/install switches off
@@ -570,3 +570,5 @@ def add_parser(sub) -> None:
     q.add_argument("--dry-run", action="store_true", help="only show what would be done")
     q.add_argument("-y", "--yes", action="store_true")
     q.set_defaults(func=cmd_quarantine)
+
+    share.add_actions(ps)

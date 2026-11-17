@@ -71,4 +71,8 @@ In Develop and Debug builds a failed LED call ends the robot software (an existi
 
 The colours are computed in `Src/Modules/BehaviorControl/LEDHandler/LEDHandler.cpp` and applied in
 `Src/Modules/Infrastructure/BoosterProvider/BoosterProvider.cpp`. This page, the legend in
-`Util/bh/bhtool/dash.py` (`LED_LEGEND`) and the code must say the same thing - change them together.
+`Util/bh/bhtool/dash.py` (`LED_LEGEND`, `LED_COLOURS`) and the code must say the same thing - change them together.
+
+`InternalStateProvider` reports the LED state (the three `LEDRequest::State` values of red, green, blue) in
+`ledState.txt` next to the status file; `bh status --json` and the dashboard read it. It reports only states
+that lasted 0.5 s, so the test-mode flashes do not appear there.

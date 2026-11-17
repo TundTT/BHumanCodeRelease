@@ -6,191 +6,755 @@
 <title>Robot dashboard</title>
 <style>
   :root {
-    --bg: #f4f5f7; --card: #ffffff; --ink: #16181d; --muted: #667085; --line: #e2e5ea;
-    --ok: #17803d; --warn: #b25e00; --fail: #c62828; --accent: #1f5fd6; --chip: #eef1f5;
+    --bg: #f3f4f7; --card: #ffffff; --ink: #15171c; --muted: #636b7a; --line: #e0e3e9; --chip: #eef0f4;
+    --ok: #15803d; --warn: #b45309; --fail: #c62828; --accent: #2457d6; --accent-ink: #fff;
+    --okbg: #e7f6ec; --warnbg: #fff4e0; --failbg: #fdecec; --robot: #c9ced8; --robot-line: #9aa1ae;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #111317; --card: #1b1e24; --ink: #eceef2; --muted: #9aa3b2; --line: #2b3038;
-            --ok: #4cc27a; --warn: #f0a44b; --fail: #ff6b6b; --accent: #7aa7ff; --chip: #262b33; }
+    :root { --bg: #101216; --card: #1a1d23; --ink: #eceef2; --muted: #9aa3b2; --line: #2a2f37; --chip: #252a32;
+            --ok: #4cc27a; --warn: #f0a44b; --fail: #ff6b6b; --accent: #7aa2ff; --accent-ink: #0d1020;
+            --okbg: #15301f; --warnbg: #36280f; --failbg: #3a1717; --robot: #3a404b; --robot-line: #59606d; }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  header { position: sticky; top: 0; z-index: 2; background: var(--card); border-bottom: 1px solid var(--line);
-           padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
-  h1 { font-size: 16px; margin: 0; }
-  .game { flex: 1 1 280px; min-width: 0; }
-  .game b { font-size: 15px; text-transform: uppercase; letter-spacing: .04em; }
+  body { margin: 0 0 56px; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  button, select, input, textarea { font: inherit; color: inherit; }
+  button { border: 1px solid var(--line); background: var(--chip); border-radius: 7px; padding: 5px 11px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button.danger { background: var(--fail); color: #fff; border-color: var(--fail); font-weight: 600; }
+  button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button.go { background: var(--ok); color: #fff; border-color: var(--ok); font-weight: 700; }
+  select, input[type=text], input[type=number] { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; }
+  a { color: var(--accent); }
+  code { background: var(--chip); border-radius: 4px; padding: 0 4px; font: 12.5px ui-monospace, Consolas, monospace; }
   .muted { color: var(--muted); }
-  button { font: inherit; border: 1px solid var(--line); background: var(--chip); color: var(--ink);
-           border-radius: 6px; padding: 5px 10px; cursor: pointer; }
-  button:hover { border-color: var(--accent); }
-  button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-  button.stop { background: var(--fail); color: #fff; border-color: var(--fail); font-weight: 700; padding: 8px 16px; }
-  .bar { padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; border-bottom: 1px solid var(--line); }
-  .bar .label { font-weight: 600; margin-right: 4px; }
-  main { padding: 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
-  .card.offline { opacity: .65; }
-  .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .name { font-size: 17px; font-weight: 700; }
-  .chip { display: inline-block; background: var(--chip); border-radius: 999px; padding: 1px 9px; font-size: 12px; white-space: nowrap; }
-  .chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); } .chip.fail { color: var(--fail); }
-  .grid { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 10px 0; }
-  .grid dt { color: var(--muted); } .grid dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-  .meter { height: 6px; border-radius: 3px; background: var(--chip); overflow: hidden; margin-top: 4px; }
-  .meter i { display: block; height: 100%; background: var(--ok); }
-  .meter i.warn { background: var(--warn); } .meter i.fail { background: var(--fail); }
-  ul.notes { list-style: none; margin: 8px 0; padding: 0; }
-  ul.notes li { padding-left: 14px; position: relative; }
-  ul.notes li::before { content: ""; position: absolute; left: 0; top: .55em; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
-  ul.notes li.warn::before { background: var(--warn); } ul.notes li.fail::before { background: var(--fail); }
-  pre { margin: 8px 0 0; padding: 8px; background: var(--chip); border-radius: 6px; font: 12px/1.4 ui-monospace, Consolas, monospace;
-        white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9.5em; overflow: auto; }
-  .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  details { margin: 0 16px 16px; } summary { cursor: pointer; color: var(--muted); }
-  table { border-collapse: collapse; margin-top: 6px; } td { padding: 2px 14px 2px 0; }
-  #toast { position: fixed; right: 16px; bottom: 16px; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 6px; display: none; }
-  .empty { padding: 24px 16px; color: var(--muted); }
+  .small { font-size: 12.5px; }
+
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line);
+           padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+  h1 { font-size: 16px; margin: 0; white-space: nowrap; }
+  .game { flex: 1 1 300px; min-width: 0; }
+  .game b { text-transform: uppercase; letter-spacing: .04em; }
+  #stopAll { padding: 8px 18px; font-size: 15px; }
+  nav { display: flex; gap: 4px; padding: 0 16px; background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 49px; z-index: 4; }
+  nav button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 9px 14px; font-weight: 600; color: var(--muted); }
+  nav button.active { color: var(--ink); border-bottom-color: var(--accent); }
+  .tab { display: none; } .tab.active { display: block; }
+  .bar { margin: 12px 16px 0; padding: 8px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+         display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+  .bar .label { font-weight: 700; margin-right: 6px; }
+  .empty { padding: 32px 16px; color: var(--muted); text-align: center; }
+
+  /* robot cards */
+  #robots { padding: 14px 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .card.offline { opacity: .7; }
+  .card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+  .card-head .name { font-size: 18px; font-weight: 700; margin-right: 2px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; background: var(--chip); border-radius: 999px; padding: 1px 9px; font-size: 12px; white-space: nowrap; }
+  .chip.ok { color: var(--ok); background: var(--okbg); } .chip.warn { color: var(--warn); background: var(--warnbg); } .chip.fail { color: var(--fail); background: var(--failbg); }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .owner { margin-left: auto; }
+  .card-body { display: grid; grid-template-columns: 128px 1fr; gap: 12px; margin-top: 10px; }
+  .figure { text-align: center; }
+  .figure svg { width: 104px; height: 150px; display: block; margin: 0 auto; }
+  .ledcap { font-size: 12.5px; margin-top: 2px; }
+  .ledcap b { display: block; }
+  .led { transition: fill .2s; }
+  .led.slow { animation: blink 1s steps(1) infinite; }
+  .led.fast { animation: blink .25s steps(1) infinite; }
+  @keyframes blink { 0% { fill: var(--led-on); } 50% { fill: var(--led-off); } }
+  .gauges { display: grid; gap: 7px; align-content: start; }
+  .gauge { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 7px; }
+  .gauge svg { width: 20px; height: 20px; color: var(--muted); }
+  .gauge .val { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 64px; text-align: right; }
+  .meter { height: 8px; border-radius: 4px; background: var(--chip); overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--ok); border-radius: 4px; }
+  .meter i.warn { background: var(--warn); } .meter i.fail { background: var(--fail); } .meter i.none { background: transparent; }
+  .wifi { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
+  .wifi i { width: 5px; background: var(--chip); border-radius: 1px; } .wifi i.on { background: var(--ok); }
+  .issues { display: grid; gap: 5px; margin-top: 10px; }
+  details.issue { border-radius: 8px; padding: 4px 9px; background: var(--chip); }
+  details.issue.warn { background: var(--warnbg); } details.issue.fail { background: var(--failbg); }
+  details.issue summary { cursor: pointer; list-style: none; display: flex; gap: 7px; align-items: baseline; }
+  details.issue summary::-webkit-details-marker { display: none; }
+  details.issue summary::before { content: "▸"; color: var(--muted); }
+  details.issue[open] summary::before { content: "▾"; }
+  details.issue.warn summary { color: var(--warn); } details.issue.fail summary { color: var(--fail); }
+  details.issue p { margin: 4px 0 2px 14px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+  .actions .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 2px; }
+  .guardbox { margin-top: 10px; padding: 8px 10px; border-radius: 9px; border: 2px solid var(--warn); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .guardbox.released { border-color: var(--ok); }
+  .busy { margin-top: 8px; font-size: 12.5px; color: var(--accent); }
+  details.more { margin-top: 8px; } details.more summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; font-size: 12.5px; margin-top: 6px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow-wrap: anywhere; }
+  pre { margin: 6px 0 0; padding: 8px; background: var(--chip); border-radius: 6px; font: 12px/1.4 ui-monospace, Consolas, monospace;
+        white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
+
+  /* policies */
+  .pol { padding: 14px 16px; display: grid; gap: 14px; grid-template-columns: minmax(280px, 360px) 1fr; }
+  @media (max-width: 900px) { .pol { grid-template-columns: 1fr; } }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .panel h2 { font-size: 15px; margin: 0 0 8px; }
+  .steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 16px 0; }
+  .step { display: flex; gap: 7px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px 4px 4px; font-size: 13px; }
+  .step b { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 12px; }
+  .drop { border: 2px dashed var(--line); border-radius: 10px; padding: 18px 10px; text-align: center; cursor: pointer; color: var(--muted); }
+  .drop.over { border-color: var(--accent); color: var(--accent); background: var(--chip); }
+  .bench { display: grid; gap: 7px; margin-top: 10px; }
+  .pfile { border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; cursor: grab; background: var(--card); }
+  .pfile:active { cursor: grabbing; }
+  .pfile .fn { font-weight: 600; overflow-wrap: anywhere; }
+  .fits { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .slots { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+  .slot { border: 2px solid var(--line); border-radius: 11px; padding: 10px 12px; min-height: 130px; }
+  .slot.over { border-color: var(--accent); background: var(--chip); }
+  .slot.bad { border-color: var(--fail); }
+  .slot h3 { margin: 0; font-size: 15px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+  .slot .row { display: grid; grid-template-columns: 74px 1fr; gap: 6px; font-size: 12.5px; margin-top: 4px; }
+  .slot .row span:last-child { overflow-wrap: anywhere; font-weight: 600; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; }
+
+  /* activity drawer */
+  #drawer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -4px 18px rgba(0,0,0,.08); }
+  #drawerHead { display: flex; gap: 10px; align-items: center; padding: 8px 16px; cursor: pointer; }
+  #drawerHead .title { font-weight: 700; }
+  #drawerBody { display: none; grid-template-columns: 240px 1fr; height: 38vh; border-top: 1px solid var(--line); }
+  #drawer.open #drawerBody { display: grid; }
+  #jobList { overflow: auto; border-right: 1px solid var(--line); }
+  #jobList div { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 13px; }
+  #jobList div.sel { background: var(--chip); }
+  #console { margin: 0; border-radius: 0; max-height: none; height: 100%; }
+  #console .fail { color: var(--fail); } #console .warn { color: var(--warn); } #console .ok { color: var(--ok); } #console .head { font-weight: 700; }
+  .spin { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+
+  /* modal, toast, help */
+  #modal { position: fixed; inset: 0; z-index: 10; background: rgba(10,12,16,.45); display: none; align-items: flex-start; justify-content: center; padding: 60px 12px; overflow: auto; }
+  #modal.open { display: flex; }
+  .dialog { background: var(--card); border-radius: 14px; width: min(560px, 100%); padding: 16px 18px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+  .dialog h2 { margin: 0 0 10px; font-size: 17px; }
+  .dialog label.f { display: grid; grid-template-columns: 150px 1fr; gap: 8px; align-items: center; margin: 8px 0; }
+  .dialog label.c { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; }
+  .dialog .note { padding: 8px 10px; border-radius: 8px; margin: 8px 0; font-size: 13px; }
+  .dialog .note.warn { background: var(--warnbg); } .dialog .note.fail { background: var(--failbg); } .dialog .note.info { background: var(--chip); }
+  .dialog .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .dialog ol { padding-left: 20px; } .dialog li { margin: 6px 0; }
+  .key { display: inline-block; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; padding: 0 6px; font-weight: 700; font-size: 12.5px; background: var(--chip); }
+  #toast { position: fixed; right: 16px; bottom: 64px; z-index: 11; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 8px; display: none; max-width: 70vw; }
+  .help { padding: 14px 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
+  .legend td { padding: 4px 10px 4px 0; vertical-align: top; }
+  .swatch { width: 16px; height: 16px; border-radius: 50%; display: inline-block; border: 1px solid var(--line); vertical-align: middle; }
+  .help details { border-top: 1px solid var(--line); padding: 6px 0; } .help summary { cursor: pointer; font-weight: 600; }
 </style>
 </head>
 <body>
 <header>
   <h1>Robot dashboard</h1>
   <div class="game" id="game"></div>
-  <button class="stop" id="stopAll" title="Ends the robot software on every robot. Robots go limp.">STOP ALL</button>
+  <span class="muted small" id="me"></span>
+  <button class="danger" id="stopAll" title="Ends the robot software on every robot. Robots go limp and fall if nobody holds them.">STOP ALL</button>
 </header>
-<div class="bar" id="guardBar" hidden></div>
-<div class="bar" id="gcBar" hidden></div>
-<main id="robots"></main>
-<div class="empty" id="empty" hidden>No robots registered. Add one with <code>bh robot onboard NAME --id N</code>.</div>
-<details><summary>Back LED colours</summary><table id="legend"></table></details>
-<details><summary>Recent actions</summary><pre id="messages"></pre></details>
+<nav>
+  <button data-tab="robots" class="active">Robots</button>
+  <button data-tab="policies">Policies</button>
+  <button data-tab="help">Help &amp; LED colours</button>
+</nav>
+
+<section class="tab active" id="tab-robots">
+  <div class="bar" id="guardBar" hidden></div>
+  <div class="bar" id="gcBar" hidden></div>
+  <div id="robots"></div>
+  <div class="empty" id="empty" hidden>No robots registered. Add one with <code>bh robot onboard NAME --id N</code>.</div>
+</section>
+
+<section class="tab" id="tab-policies">
+  <div class="steps">
+    <span class="step"><b>1</b>Drop a policy file</span>
+    <span class="step"><b>2</b>Drag it onto a slot, "simulator only"</span>
+    <span class="step"><b>3</b>Try it in the simulator</span>
+    <span class="step"><b>4</b>Drag it again, "real robots"</span>
+    <span class="step"><b>5</b>Send it to a robot</span>
+  </div>
+  <div class="pol">
+    <div class="panel">
+      <h2>Policy files</h2>
+      <div class="drop" id="drop">Drop <b>.onnx</b> files here<br><span class="small">or click to choose</span></div>
+      <input type="file" id="fileInput" accept=".onnx" multiple hidden>
+      <div class="bench" id="bench"></div>
+      <details style="margin-top:10px"><summary class="muted small">Files already in the repository</summary><div class="bench" id="repoFiles"></div></details>
+    </div>
+    <div class="panel">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <h2 style="margin:0">Slots</h2>
+        <span class="seg" id="modelSeg"></span>
+      </div>
+      <div class="slots" id="slots"></div>
+      <div class="actions" style="margin-top:14px" id="polActions"></div>
+      <p class="muted small">Using a file changes <code>Config/</code> in this checkout, exactly like <code>bh policy use</code>.
+        Undo with git; commit when it is good. Sizes must match what the C++ code feeds the network
+        (<a href="#" data-help="policies">why</a>).</p>
+    </div>
+  </div>
+</section>
+
+<section class="tab" id="tab-help">
+  <div class="help" id="help"></div>
+</section>
+
+<div id="drawer">
+  <div id="drawerHead"><span class="title">Activity</span><span id="drawerSummary" class="muted small"></span><span style="margin-left:auto" class="muted small" id="drawerToggle">show ▴</span></div>
+  <div id="drawerBody"><div id="jobList"></div><pre id="console"></pre></div>
+</div>
+<div id="modal"><div class="dialog" id="dialog"></div></div>
 <div id="toast"></div>
+
 <script>
 "use strict";
 const token = new URLSearchParams(location.search).get("t") || "";
 const $ = id => document.getElementById(id);
-function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
-function toast(text) { const t = $("toast"); t.textContent = text; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 2500); }
-async function act(body, question) {
-  if (question && !confirm(question)) return;
+/** Element builder. Strings become text (never HTML). */
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === "class") e.className = v; else if (k.startsWith("on")) e[k] = v; else if (k === "style") e.style.cssText = v;
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k instanceof Node ? k : String(k));
+  return e;
+}
+Element.prototype.put = function (...kids) { this.append(...kids.flat().filter(k => k !== null && k !== undefined && k !== false)); return this; };
+function svg(markup) { const t = document.createElement("template"); t.innerHTML = markup.trim(); return t.content.firstChild; }
+function toast(text) { const t = $("toast"); t.textContent = text; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 3500); }
+function ago(s) { if (s == null) return "?"; s = Math.max(0, s | 0); return s < 90 ? s + " s" : s < 5400 ? Math.round(s / 60) + " min" : (s / 3600).toFixed(1) + " h"; }
+function mmss(s) { s = Math.max(0, s | 0); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+
+let ST = null, META = null, model = null;
+async function act(body) {
   try {
     const r = await fetch("/api/action", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(Object.assign({token}, body))});
-    const j = await r.json(); toast(j.ok || j.error || "done");
-  } catch (e) { toast("dashboard not reachable"); }
-  refresh();
+    const j = await r.json();
+    toast(j.ok || j.error || "done");
+    if (j.data && j.data.job) follow(j.data.job);
+    refresh();
+    return j.error ? null : (j.data || {});
+  } catch (e) { toast("dashboard not reachable - is bh dash still running?"); return null; }
 }
-function btn(text, fn, cls, title) { const b = el("button", cls, text); if (title) b.title = title; b.onclick = fn; return b; }
-function mmss(s) { s = Math.max(0, s | 0); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
-function ago(s) { if (s == null) return "?"; s = s | 0; return s < 90 ? s + " s" : s < 5400 ? Math.round(s / 60) + " min" : (s / 3600).toFixed(1) + " h"; }
+async function loadMeta() { try { META = await (await fetch("/api/meta?t=" + encodeURIComponent(token))).json(); } catch (e) {} renderPolicies(); return META; }
 
+// ---------------------------------------------------------------- tabs
+for (const b of document.querySelectorAll("nav button")) b.onclick = () => showTab(b.dataset.tab);
+function showTab(name) {
+  for (const b of document.querySelectorAll("nav button")) b.classList.toggle("active", b.dataset.tab === name);
+  for (const s of document.querySelectorAll(".tab")) s.classList.toggle("active", s.id === "tab-" + name);
+  if (name === "policies") loadMeta();
+}
+
+// ---------------------------------------------------------------- modal
+function modal(title, body, buttons) {
+  const d = $("dialog"); d.textContent = "";
+  d.append(h("h2", {}, title), body, h("div", {class: "buttons"}, buttons, h("button", {onclick: closeModal}, "Cancel")));
+  $("modal").classList.add("open");
+}
+function closeModal() { $("modal").classList.remove("open"); }
+$("modal").onclick = e => { if (e.target === $("modal")) closeModal(); };
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+function check(label, opts) { const i = h("input", Object.assign({type: "checkbox"}, opts || {})); return [h("label", {class: "c"}, i, h("span", {}, label)), i]; }
+/** A button that is only enabled while every checkbox in `needs` is ticked. */
+function guarded(text, cls, needs, onclick) {
+  const b = h("button", {class: cls, onclick});
+  b.textContent = text;
+  const upd = () => b.disabled = needs.some(n => n && !n.checked);
+  for (const n of needs) if (n) n.addEventListener("change", upd);
+  upd(); return b;
+}
+/** The note and checkbox shown when somebody else uses the robot. Returns [nodes, checkbox or null]. */
+function claimGate(s, verb) {
+  const c = s.claim;
+  if (!c || c.expired || c.mine) return [[], null];
+  const [lab, box] = check("I asked " + c.who + " - " + verb + " anyway");
+  return [[h("div", {class: "note fail"}, h("b", {}, "In use by " + c.who), c.note ? " (" + c.note + ")" : "", ", claimed " + ago(c.age_s) + " ago. ",
+                                                  "Whatever is on the robot now is their work."), lab], box];
+}
+function limpGate(name) {
+  const [lab, box] = check(name + " is sitting or held (the robot software stops: it goes limp)");
+  return [lab, box];
+}
+
+// ---------------------------------------------------------------- the game and the bars
 function renderGame(st) {
   const g = st.game, box = $("game"); box.textContent = "";
-  if (!g) { box.append(el("span", "muted", "No GameController heard" + (st.testgc ? " yet" : " (bh gc doctor)") + ". Robots follow their buttons.")); return; }
-  if (g.problem && !g.state) { box.append(el("span", "chip fail", g.problem)); return; }
-  box.append(el("b", "", g.state + (g.stopped ? " - STOPPED" : "")));
-  let text = "  " + (g.first_half ? "1st" : "2nd") + " half, " + mmss(g.secs) + " left   team " + g.teams[0] + "  " + g.score[0] + " : " + g.score[1] + "  team " + g.teams[1];
-  if (g.set_play !== "none") text += "   " + g.set_play;
-  if (g.secondary > 0) text += "   (" + g.secondary + " s)";
-  box.append(el("span", "", text));
-  box.append(el("div", "muted", "GameController " + g.source + (st.testgc ? " (TEST controller of this dashboard)" : "") + (g.age > 3 ? " - LOST " + ago(g.age) + " ago" : "") + (g.own_in_game ? "" : " - team " + st.team + " is NOT in this game")));
+  if (!g) { box.append(h("span", {class: "muted"}, "No GameController heard" + (st.testgc ? " yet" : "") + ". Robots follow their buttons.")); return; }
+  if (g.problem && !g.state) { box.append(h("span", {class: "chip fail"}, g.problem)); return; }
+  box.append(h("b", {}, g.state + (g.stopped ? " - STOPPED" : "")), "  " + (g.first_half ? "1st" : "2nd") + " half, " + mmss(g.secs) + " left   team " + g.teams[0] + "  " + g.score[0] + " : " + g.score[1] + "  team " + g.teams[1]
+    + (g.set_play !== "none" ? "   " + g.set_play : "") + (g.secondary > 0 ? "   (" + g.secondary + " s)" : ""));
+  box.append(h("div", {class: "muted small"}, "GameController " + g.source + (st.testgc ? " (TEST controller of this dashboard)" : "") + (g.age > 3 ? " - LOST " + ago(g.age) + " ago" : "") + (g.own_in_game ? "" : " - team " + st.team + " is NOT in this game")));
 }
-// Parts of the page are only rebuilt when what they show has changed. Otherwise a button
-// could be replaced between pressing and releasing the mouse and the click would be lost.
+// Parts of the page are only rebuilt when what they show has changed; otherwise a button could be
+// replaced between pressing and releasing the mouse and the click would be lost.
 const shown = new Map();
 function changed(key, value) { const j = JSON.stringify(value); if (shown.get(key) === j) return false; shown.set(key, j); return true; }
 function renderBars(st) {
   const gb = $("guardBar"), cb = $("gcBar"), g = st.game || {};
   if (changed("guard", st.guard)) {
     gb.hidden = !st.guard.enabled; gb.textContent = "";
-    if (st.guard.enabled) {
-      gb.append(el("span", "label", "Laptop guard"));
-      gb.append(btn("RUN - robots may move", () => act({action: "guard", released: true}), st.guard.released ? "on" : ""));
-      gb.append(btn("STOP - robots stand still", () => act({action: "guard", released: false}), st.guard.released ? "" : "on"));
-      gb.append(el("span", "muted", "Closing this tab stops the robots."));
-    }
+    if (st.guard.enabled) gb.append(h("span", {class: "label"}, "Laptop guard (all robots)"),
+      h("button", {class: st.guard.released ? "go" : "", onclick: () => act({action: "guard", released: true})}, "RUN - robots may move"),
+      h("button", {class: st.guard.released ? "" : "danger", onclick: () => act({action: "guard", released: false})}, "STOP - robots stand still"),
+      h("span", {class: "muted small"}, "Closing this tab stops the robots."));
   }
   if (changed("gc", [st.testgc, g.state, g.stopped])) {
     cb.hidden = !st.testgc; cb.textContent = "";
     if (st.testgc) {
-      cb.append(el("span", "label", "Test GameController"));
-      for (const s of ["initial", "ready", "set", "playing", "finished"])
-        cb.append(btn(s, () => act({action: "gc_state", state: s}), g.state === s ? "on" : ""));
+      cb.append(h("span", {class: "label"}, "Test GameController"));
+      for (const s of ["initial", "ready", "set", "playing", "finished"]) cb.append(h("button", {class: g.state === s ? "on" : "", onclick: () => act({action: "gc_state", state: s})}, s));
       const stopped = !!g.stopped;
-      cb.append(btn(stopped ? "RELEASE (go)" : "FREEZE (stop flag)", () => act({action: "gc_stopped", stopped: !stopped}), stopped ? "on" : "", "All robots stand still while the stop flag is set."));
-      cb.append(btn("goal for us", () => act({action: "gc_goal", own: true})));
-      cb.append(btn("goal against", () => act({action: "gc_goal", own: false})));
+      cb.append(h("button", {class: stopped ? "on" : "", title: "All robots stand still while the stop flag is set.", onclick: () => act({action: "gc_stopped", stopped: !stopped})}, stopped ? "RELEASE (go)" : "FREEZE (stop flag)"),
+        h("button", {onclick: () => act({action: "gc_goal", own: true})}, "goal for us"), h("button", {onclick: () => act({action: "gc_goal", own: false})}, "goal against"));
     }
   }
 }
-function row(dl, k, v) { if (v === undefined || v === null || v === "") return; dl.append(el("dt", "", k)); const dd = el("dd"); if (v instanceof Node) dd.append(v); else dd.textContent = v; dl.append(dd); }
-function meter(pct, level) { const m = el("div", "meter"), i = el("i", level || ""); i.style.width = Math.max(0, Math.min(100, pct)) + "%"; m.append(i); return m; }
-function renderInfo(c, s) {
-  c.textContent = "";
-  const top = el("div", "top"); top.append(el("span", "name", s.name));
-  const sw = s.reachable == null ? ["", "checking..."] : !s.reachable ? ["fail", "offline"] : s.service === "active" ? ["ok", "running"] : s.service === "failed" ? ["fail", "crashed"] : ["warn", "not running"];
-  top.append(el("span", "chip " + sw[0], sw[1])); c.append(top);
-  c.append(el("div", "muted", s.ip + (s.model ? "  " + s.model.toUpperCase() : "") + (s.hardware ? "  (" + s.hardware + ")" : "")));
-  if (!s.reachable) { if (s.error) c.append(el("div", "muted", s.error)); return; }
-  const dl = el("dl", "grid"), cfg = s.settings || {};
-  if (s.battery != null) { const d = el("div"); d.append(s.battery + " %"); d.append(meter(s.battery, s.battery_level === "ok" ? "" : s.battery_level)); row(dl, "battery", d); }
-  else row(dl, "battery", "unknown");
-  row(dl, "temperature", (s.max_temp != null ? "hottest joint " + s.max_temp + " C" : "joints ?") + (s.zones && s.zones.length ? ", computer " + Math.max(...s.zones).toFixed(0) + " C" : ""));
-  row(dl, "identity", "team " + (cfg.teamNumber || "?") + ", player " + (cfg.playerNumber || "?"));
-  row(dl, "setup", (cfg.scenario || "?") + " / " + (cfg.location || "?") + (s.led ? ", LED mode " + s.led : ""));
-  if (s.gc) row(dl, "referee", s.gc.penalty === "none" ? "in play" : "PENALIZED: " + s.gc.penalty + (s.gc.secs ? " (" + s.gc.secs + " s)" : ""));
-  if (s.reply) row(dl, "robot says", (s.reply.fallen ? "FALLEN, " : "upright, ") + "at x " + s.reply.pose[0] + " y " + s.reply.pose[1] + " mm facing " + s.reply.pose[2] + " deg; ball " + (s.reply.ball_age < 0 ? "never seen" : "seen " + s.reply.ball_age + " s ago") + (s.reply.age > 3 ? " (stale " + ago(s.reply.age) + ")" : ""));
-  row(dl, "computer", [s.load && s.load.length ? "load " + s.load[0] : "", s.mem_pct != null ? "memory " + s.mem_pct + " %" : "", s.disk_free_gb != null ? s.disk_free_gb + " GB free" : ""].filter(Boolean).join(", "));
-  if (s.wifi) row(dl, "wifi", s.wifi.dbm + " dBm (" + s.wifi.device + ")");
-  row(dl, "switched on", ago(s.uptime_s) + " ago" +(s.binary_time && s.robot_time ? ", deployed " + ago(s.robot_time - s.binary_time) + " ago" : ""));
-  c.append(dl);
-  const notes = el("ul", "notes");
-  for (const [level, text] of (s.assess || [])) if (level !== "ok") notes.append(el("li", level, text));
-  if (notes.children.length) c.append(notes);
-  if (s.log && s.log.length) c.append(el("pre", "", s.log.join("\n")));
+
+// ---------------------------------------------------------------- robot figure and LED
+const ICON = {
+  battery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/></svg>',
+  joint: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 14V4a2 2 0 1 0-4 0v10a4 4 0 1 0 4 0z" transform="translate(2 0)"/></svg>',
+  cpu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>',
+  wifi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a15 15 0 0 1 20 0M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0"/><circle cx="12" cy="20" r="1"/></svg>',
+  disk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/></svg>',
+};
+function robotFigure() {
+  return svg(`<svg viewBox="0 0 100 150" aria-hidden="true">
+    <g fill="var(--robot)" stroke="var(--robot-line)" stroke-width="1.5">
+      <rect x="34" y="6" width="32" height="26" rx="9"/>
+      <rect x="44" y="32" width="12" height="6"/>
+      <rect x="27" y="38" width="46" height="50" rx="10"/>
+      <rect x="13" y="42" width="11" height="40" rx="5"/><rect x="76" y="42" width="11" height="40" rx="5"/>
+      <rect x="33" y="88" width="14" height="48" rx="5"/><rect x="53" y="88" width="14" height="48" rx="5"/>
+      <rect x="29" y="134" width="20" height="9" rx="3"/><rect x="51" y="134" width="20" height="9" rx="3"/>
+    </g>
+    <rect x="40" y="15" width="20" height="6" rx="3" fill="var(--robot-line)"/>
+    <circle class="ledglow" cx="50" cy="60" r="15" opacity=".35"/>
+    <circle class="led" cx="50" cy="60" r="9" stroke="var(--robot-line)" stroke-width="1.5"/>
+  </svg>`);
 }
-function renderActions(a, name, passive, player, penalized) {
-  a.textContent = "";
-  if (passive) return;
-  a.append(btn("Stop", () => act({action: "stop", robot: name}), "", "Ends the robot software: the robot goes limp."));
-  a.append(btn("Start", () => act({action: "start", robot: name})));
-  a.append(btn("Restart", () => act({action: "restart", robot: name}, "Restarting makes " + name + " go limp for a moment. Is it sitting or held?")));
-  if (player) a.append(btn(penalized ? "Unpenalize" : "Penalize", () => act({action: "gc_penalize", player, on: !penalized}), penalized ? "on" : ""));
+function rgb(a) { return "rgb(" + a.join(",") + ")"; }
+/** [css on, css off, blink, title, text] for a robot's LED. */
+function ledLook(s) {
+  const grey = "var(--chip)";
+  if (s.reachable === false) return [grey, grey, "", "offline", "The robot does not answer."];
+  if (s.reachable == null) return [grey, grey, "", "checking...", ""];
+  if (s.service !== "active") return [grey, grey, "", "software not running", "The robot software is stopped, so nothing controls the LED. Start it to see its state here."];
+  const v = s.led_view;
+  if (!v) return [grey, grey, "", "no LED report", "This robot runs software without the LED report. Deploy the current code to see its LED here; until then look at the robot (Help tab explains the colours)."];
+  const stale = v.age_s != null && v.age_s > 20;
+  return [rgb(v.rgb), rgb(v.rgb_off), v.blink === "steady" ? "" : v.blink, v.colour + (v.blink === "steady" ? "" : ", " + v.blink + " blinking"),
+          v.meaning + (stale ? " - but no new report for more than 20 s: is the robot software stuck?" : "")];
+}
+function renderLED(fig, cap, s) {
+  const [on, off, blink, title, text] = ledLook(s);
+  const led = fig.querySelector(".led"), glow = fig.querySelector(".ledglow");
+  led.style.setProperty("--led-on", on); led.style.setProperty("--led-off", off);
+  led.setAttribute("fill", on); led.setAttribute("class", "led " + blink);
+  glow.setAttribute("fill", on); glow.style.display = on.startsWith("rgb") ? "" : "none";
+  cap.textContent = "";
+  cap.append(h("b", {}, title), h("span", {class: "muted"}, text));
+}
+
+// ---------------------------------------------------------------- gauges
+function meter(pct, level) { return h("div", {class: "meter"}, h("i", {class: level || "", style: "width:" + Math.max(0, Math.min(100, pct)) + "%"})); }
+function gauge(icon, title, bar, value) { return h("div", {class: "gauge", title}, svg(ICON[icon]), bar, h("span", {class: "val"}, value)); }
+function renderGauges(box, s) {
+  box.textContent = "";
+  if (!s.reachable) { box.append(h("div", {class: "muted"}, s.reachable == null ? "Checking..." : s.error || "not reachable")); return; }
+  const lvl = s.battery_level === "ok" ? "" : s.battery_level;
+  box.append(gauge("battery", "Battery (reported by the robot software while it runs)", s.battery != null ? meter(s.battery, lvl) : meter(0, "none"), s.battery != null ? s.battery + " %" : "unknown"));
+  const t = s.max_temp, tl = t == null ? "none" : t >= 88 ? "fail" : t >= 76 ? "warn" : "";
+  box.append(gauge("joint", "Hottest joint motor (hot from 76 C, very hot from 88 C)", meter(t == null ? 0 : (t - 20) / 0.8, tl), t != null ? t + " C" : "?"));
+  const z = s.zones && s.zones.length ? Math.max(...s.zones) : null;
+  box.append(gauge("cpu", "Robot computer temperature", meter(z == null ? 0 : (z - 20) / 0.8, z == null ? "none" : z >= 85 ? "warn" : ""), z != null ? z.toFixed(0) + " C" : "?"));
+  if (s.wifi) { const q = s.wifi.dbm, bars = q >= -55 ? 4 : q >= -65 ? 3 : q >= -75 ? 2 : q >= -85 ? 1 : 0; const w = h("div", {class: "wifi"}); for (let i = 1; i <= 4; i++) w.append(h("i", {class: i <= bars ? "on" : "", style: "height:" + (i * 25) + "%"})); box.append(gauge("wifi", "Wireless signal of " + s.wifi.device, w, q + " dBm")); }
+  else box.append(gauge("wifi", "No wireless connection reported (cable only?)", h("span", {class: "muted small"}, "cable / none"), ""));
+  if (s.disk_free_gb != null) box.append(gauge("disk", "Disk of the robot", meter(s.disk_used_pct || 0, s.disk_free_gb < 2 ? "warn" : ""), s.disk_free_gb + " GB free"));
+}
+
+// ---------------------------------------------------------------- issues with explanations
+const EXPLAIN = [
+  [/robot software is not running/, "The program that controls the robot is stopped, so the robot is limp. Press Start when the robot sits or is held; it starts limp, then hold STAND on the robot for 2 s."],
+  [/crashed/, "The robot software ended with an error. Open Log and Crash dump to see why. Start runs it again."],
+  [/crash dump/, "An earlier run left a crash report on the robot. Open Crash dump to read it - it usually names the module that failed."],
+  [/battery level unknown/, "The robot software reports the battery only while it runs. If it runs and this stays unknown, Scan tells you whether the robot can write its status file."],
+  [/below the/, "Change the battery now: with a low battery the motors sag and the robot falls more."],
+  [/change it before a game/, "Enough for short tests, not for a game."],
+  [/cool down/, "Very hot motors lose strength and can be damaged. Let the robot sit (Stop makes it limp) for a few minutes."],
+  [/hottest joint/, "Warm. Fine for short tests; keep an eye on it."],
+  [/computer at/, "The robot's computer is hot. Check that its fan runs and the vents are free."],
+  [/GB free/, "Old logs fill the disk. Download and delete them: bh logs NAME --download --delete (the robot goes limp meanwhile)."],
+  [/calibration saved on the robot/, "Somebody calibrated this robot on the robot itself. A deploy keeps that calibration (it is rescued first); bh calib pull NAME copies it into the repository so the team has it."],
+  [/laptop guard is armed/, "This robot only moves while a laptop sends 'go'. Use the guard box below (RUN / STOP) or bh guard NAME. A normal deploy removes the guard."],
+];
+function explain(text) { for (const [re, t] of EXPLAIN) if (re.test(text)) return t; return "See Docs/testing-and-safety.md."; }
+function renderIssues(box, s) {
+  box.textContent = "";
+  for (const [level, text] of (s.assess || [])) if (level !== "ok") box.append(h("details", {class: "issue " + level}, h("summary", {}, text), h("p", {}, explain(text))));
+}
+
+// ---------------------------------------------------------------- per robot actions and dialogs
+function claimText(c) { return c.mine ? "yours" + (c.note ? ": " + c.note : "") : "in use by " + c.who + (c.note ? ": " + c.note : ""); }
+function renderHead(box, s) {
+  box.textContent = "";
+  const sw = s.reachable == null ? ["", "checking..."] : !s.reachable ? ["fail", "offline"] : s.service === "active" ? ["ok", "running"] : s.service === "failed" ? ["fail", "crashed"] : ["warn", "not running"];
+  box.append(h("span", {class: "name"}, s.name), h("span", {class: "chip " + sw[0]}, h("span", {class: "dot"}), sw[1]), h("span", {class: "chip"}, (s.model || "").toUpperCase() || "?"));
+  const c = s.claim && !s.claim.expired ? s.claim : null;
+  box.append(h("span", {class: "owner chip " + (c ? (c.mine ? "ok" : "warn") : ""), title: c ? "claimed " + ago(c.age_s) + " ago, ends in " + ago(c.left_s) : "Nobody has claimed this robot (bh robot claim)"},
+    c ? claimText(c) : "free"));
+  box.append(h("div", {class: "muted small", style: "flex-basis:100%"}, s.ip + (s.hardware ? " - " + s.hardware : "") + (s.backups ? " - " + s.backups + " backup(s) on the robot" : "")));
+}
+function renderActions(box, s, st) {
+  box.textContent = "";
+  if (st.passive || !s.reachable) return;
+  const name = s.name, c = s.claim && !s.claim.expired ? s.claim : null;
+  const player = st.testgc ? parseInt((s.settings || {}).playerNumber, 10) || 0 : 0, penalized = !!(s.gc && s.gc.penalty !== "none");
+  box.put(h("button", {class: "primary", onclick: () => deployDialog(name)}, "Deploy…"),
+    h("button", {onclick: () => pushDialog(name)}, "Send policies…"),
+    h("button", {onclick: () => gamepadDialog(name)}, "Drive with gamepad"),
+    h("span", {class: "sep"}),
+    s.service === "active" ? h("button", {title: "Ends the robot software: the robot goes limp at once.", onclick: () => act({action: "stop", robot: name})}, "Stop")
+                           : h("button", {title: "Starts the robot software. The robot starts limp.", onclick: () => act({action: "start", robot: name})}, "Start"),
+    h("button", {onclick: () => restartDialog(name)}, "Restart"),
+    h("span", {class: "sep"}),
+    c && c.mine ? h("button", {onclick: () => act({action: "release", robot: name})}, "Release") : h("button", {onclick: () => claimDialog(name)}, c ? "Claimed…" : "Claim"),
+    h("button", {onclick: () => backupDialog(name)}, "Back up"),
+    h("button", {onclick: () => restoreDialog(name)}, "Restore…"),
+    h("span", {class: "sep"}),
+    st.testgc && player ? h("button", {class: penalized ? "on" : "", title: "Test GameController: penalize / unpenalize this player",
+                                       onclick: () => act({action: "gc_penalize", player, on: !penalized})}, penalized ? "Unpenalize" : "Penalize") : null,
+    h("button", {title: "Read-only check: what is installed, will the software run?", onclick: () => act({action: "scan", robot: name})}, "Scan"),
+    h("button", {onclick: () => act({action: "logs", robot: name})}, "Log"),
+    s.dump ? h("button", {onclick: () => act({action: "logs", robot: name, crash: true})}, "Crash dump") : null);
+}
+function renderGuard(box, s) {
+  box.textContent = ""; box.hidden = !(s.guard || s.heartbeat);
+  if (box.hidden) return;
+  const hb = s.heartbeat, released = !!(hb && hb.released);
+  box.className = "guardbox" + (released ? " released" : "");
+  box.put(h("b", {}, "Laptop guard"), h("span", {class: "muted small"}, s.guard ? (released ? "robot may move" : "robot stands still until RUN") : "heartbeat running, but the robot was not deployed with the guard"),
+    h("button", {class: released ? "go" : "", onclick: () => act({action: "guard", robot: s.name, released: true})}, "RUN"),
+    h("button", {class: released ? "" : "danger", onclick: () => act({action: "guard", robot: s.name, released: false})}, "STOP"),
+    hb ? h("button", {title: "Stops sending. The robot stays stopped until a guard sends RUN again.", onclick: () => act({action: "guard_heartbeat", robot: s.name, on: false})}, "End heartbeat") : null,
+    h("span", {class: "muted small", style: "flex-basis:100%"}, "Soft stop: the robot stands still. Closing this page = STOP. Hard stop: Stop / STOP ALL or the robot's red button."));
+}
+function renderMore(box, s) {
+  box.textContent = "";
+  if (!s.reachable) return;
+  const cfg = s.settings || {}, kv = h("dl", {class: "kv"});
+  const add = (k, v) => { if (v) kv.append(h("dt", {}, k), h("dd", {}, v)); };
+  add("team / player", "team " + (cfg.teamNumber || "?") + ", player " + (cfg.playerNumber || "?"));
+  add("scenario", (cfg.scenario || "?") + " / " + (cfg.location || "?") + (s.led ? ", LED mode " + s.led : ""));
+  if (s.gc) add("referee", s.gc.penalty === "none" ? "in play" : "PENALIZED: " + s.gc.penalty + (s.gc.secs ? " (" + s.gc.secs + " s)" : ""));
+  if (s.reply) add("robot says", (s.reply.fallen ? "FALLEN, " : "upright, ") + "at x " + s.reply.pose[0] + " y " + s.reply.pose[1] + " mm facing " + s.reply.pose[2] + " deg; ball " + (s.reply.ball_age < 0 ? "never seen" : "seen " + s.reply.ball_age + " s ago"));
+  add("computer", [s.load && s.load.length ? "load " + s.load[0] : "", s.mem_pct != null ? "memory " + s.mem_pct + " %" : ""].filter(Boolean).join(", "));
+  add("switched on", ago(s.uptime_s) + " ago" + (s.binary_time && s.robot_time ? ", deployed " + ago(s.robot_time - s.binary_time) + " ago" : ""));
+  add("more", "camera, joints, behaviour: bh connect " + s.name);
+  box.append(kv);
+  if (s.log && s.log.length) box.append(h("pre", {}, s.log.join("\n")));
 }
 const cards = new Map();
 function renderRobots(st) {
   const box = $("robots"), seen = new Set();
   for (const s of st.robots) {
     seen.add(s.name);
-    let card = cards.get(s.name);
-    if (!card) {
-      card = {root: el("div", "card"), info: el("div"), actions: el("div", "actions"), hint: el("div", "muted", "Joint angles, camera, behaviour: bh connect " + s.name)};
-      card.root.append(card.info, card.actions, card.hint); cards.set(s.name, card); box.append(card.root);
+    let c = cards.get(s.name);
+    if (!c) {
+      c = {root: h("div", {class: "card"}), head: h("div", {class: "card-head"}), fig: robotFigure(), cap: h("div", {class: "ledcap"}), gauges: h("div", {class: "gauges"}),
+           issues: h("div", {class: "issues"}), guard: h("div", {class: "guardbox"}), busy: h("div", {class: "busy"}), actions: h("div", {class: "actions"}), more: h("div")};
+      c.root.append(c.head, h("div", {class: "card-body"}, h("div", {class: "figure"}, c.fig, c.cap), c.gauges), c.issues, c.guard, c.busy, c.actions,
+                    h("details", {class: "more"}, h("summary", {}, "Details and last log lines"), c.more));
+      cards.set(s.name, c); box.append(c.root);
     }
-    card.root.className = "card" + (s.reachable === false ? " offline" : "");
-    card.hint.hidden = !s.reachable;
-    // The time of the poll and the age of the robot's answer change all the time without changing what is shown.
-    const view = Object.assign({}, s, {time: 0, reply: s.reply && Object.assign({}, s.reply, {age: s.reply.age > 3 ? s.reply.age : 0})});
-    if (changed("info:" + s.name, view)) renderInfo(card.info, s);
-    const player = st.testgc ? parseInt((s.settings || {}).playerNumber, 10) || 0 : 0;
-    const penalized = !!(s.gc && s.gc.penalty !== "none");
-    const noActions = st.passive || !s.reachable;   // nothing to click for a robot that cannot be reached
-    if (changed("actions:" + s.name, [noActions, player, penalized])) renderActions(card.actions, s.name, noActions, player, penalized);
+    c.root.className = "card" + (s.reachable === false ? " offline" : "");
+    const view = Object.assign({}, s, {time: 0, robot_time: 0, uptime_s: 0, reply: null, claim: s.claim && Object.assign({}, s.claim, {age_s: 0, left_s: 0}),
+                                       led_view: s.led_view && Object.assign({}, s.led_view, {age_s: s.led_view.age_s > 20})});
+    if (changed("head:" + s.name, [view.name, view.reachable, view.service, view.model, view.claim, view.ip, view.hardware, view.backups])) renderHead(c.head, s);
+    if (changed("led:" + s.name, [view.reachable, view.service, view.led_view])) renderLED(c.fig, c.cap, s);
+    if (changed("gauges:" + s.name, [s.reachable, s.error, s.battery, s.battery_level, s.max_temp, s.zones, s.wifi, s.disk_free_gb])) renderGauges(c.gauges, s);
+    if (changed("issues:" + s.name, s.assess || [])) renderIssues(c.issues, s);
+    if (changed("guard:" + s.name, [s.guard, s.heartbeat])) renderGuard(c.guard, s);
+    c.busy.textContent = s.busy ? "● busy: " + s.busy : "";
+    if (changed("actions:" + s.name, [st.passive, st.testgc, s.reachable, s.service, view.claim, s.dump, (s.settings || {}).playerNumber, s.gc && s.gc.penalty])) renderActions(c.actions, s, st);
+    if (changed("more:" + s.name, [view, s.reply && s.reply.age > 3])) renderMore(c.more, s);
   }
-  for (const [name, card] of cards) if (!seen.has(name)) { card.root.remove(); cards.delete(name); shown.delete("info:" + name); shown.delete("actions:" + name); }
+  for (const [name, c] of cards) if (!seen.has(name)) { c.root.remove(); cards.delete(name); for (const k of [...shown.keys()]) if (k.endsWith(":" + name)) shown.delete(k); }
   $("empty").hidden = st.robots.length > 0;
 }
-let legendDone = false;
+const robot = name => (ST && ST.robots.find(r => r.name === name)) || {name};
+
+async function deployDialog(name) {
+  const s = robot(name), meta = META || await loadMeta();
+  if (!meta) return;
+  const cfg = s.settings || {}, rm = meta.robots[name] || {walk: {}};
+  const config = h("select", {}, ...Object.keys(meta.builds).map(c => h("option", {value: c, selected: c === "Develop"}, c + (c === "Release" ? " (games: fastest, no assertions)" : c === "Develop" ? " (testing)" : " (slow)"))));
+  const [buildL, build] = check("Build first (recommended: the build includes your latest code)", {checked: true});
+  const scenario = h("select", {}, ...meta.scenarios.map(n => h("option", {value: n, selected: n === (cfg.scenario || meta.default_scenario)}, n)));
+  const walk = h("div", {class: "muted small"});
+  const showWalk = () => walk.textContent = rm.walk[scenario.value] ? "Walk speed with this scenario: " + rm.walk[scenario.value] : "";
+  scenario.onchange = showWalk; showWalk();
+  const player = h("input", {type: "number", min: 1, max: 20, placeholder: "keep (" + (cfg.playerNumber || "?") + ")", style: "width:110px"});
+  const led = h("select", {}, h("option", {value: ""}, "keep"), h("option", {value: "test"}, "test - flashes on problems"), h("option", {value: "match"}, "match - shows GameController contact"), h("option", {value: "auto"}, "automatic"));
+  const [guardL, guard] = check("Arm the laptop guard: the robot only moves while this page (or bh guard) sends RUN");
+  const otherClaim = s.claim && !s.claim.expired && !s.claim.mine;
+  const [backupL, backup] = check("Back up what is on the robot first (so it can be restored for whoever used it)", {checked: otherClaim || !s.backups});
+  const [dryL, dry] = check("Dry run: check everything, copy nothing");
+  const [gateNodes, gate] = claimGate(s, "deploy");
+  const [limpL, limp] = limpGate(name);
+  const binNote = h("div", {class: "note warn"});
+  const upd = () => { const b = meta.builds[config.value]; binNote.hidden = build.checked || (b && b.exists); binNote.textContent = "There is no " + config.value + " build yet - tick 'Build first'."; };
+  config.onchange = upd; build.onchange = upd; upd();
+  const go = guarded("Deploy", "primary", [gate, limp], async () => {
+    closeModal();
+    await act({action: "deploy", robot: name, config: config.value, build: build.checked, scenario: scenario.value, player: player.value ? parseInt(player.value, 10) : null,
+               led: led.value, guard: guard.checked, backup: backup.checked, dry_run: dry.checked, ignore_claim: !!(gate && gate.checked)});
+  });
+  dry.addEventListener("change", () => { limp.checked = limp.checked || dry.checked; limp.dispatchEvent(new Event("change")); });
+  modal("Deploy to " + name, h("div", {},
+    h("label", {class: "f"}, "Build", config), buildL, binNote,
+    h("label", {class: "f"}, "Scenario", scenario), walk,
+    h("label", {class: "f"}, "Player number", player),
+    h("label", {class: "f"}, "Back LED mode", led),
+    guardL, backupL, dryL, gateNodes,
+    h("div", {class: "note warn"}, "Deploying replaces the robot's software and its whole configuration. Calibration and inference engines saved on the robot are rescued first."),
+    limpL), go);
+}
+function pushDialog(name) {
+  const s = robot(name);
+  const [gateNodes, gate] = claimGate(s, "send");
+  const [limpL, limp] = limpGate(name);
+  modal("Send policies to " + name, h("div", {},
+    h("p", {}, "Copies only the policy files and their configuration (what the Policies tab shows under 'Real robots') - no build, no full deploy - and restarts the robot software."),
+    h("p", {class: "muted small"}, "'Compare' only lists the files that differ."),
+    gateNodes, limpL),
+    [h("button", {onclick: () => { closeModal(); act({action: "policy_push", robot: name, dry_run: true}); }}, "Compare"),
+     guarded("Send and restart", "primary", [gate, limp], () => { closeModal(); act({action: "policy_push", robot: name, ignore_claim: !!(gate && gate.checked)}); })]);
+}
+function restartDialog(name) {
+  const [limpL, limp] = limpGate(name);
+  modal("Restart " + name, h("div", {}, h("p", {}, "The robot goes limp for a moment and starts limp again."), limpL),
+        guarded("Restart", "primary", [limp], () => { closeModal(); act({action: "restart", robot: name}); }));
+}
+function claimDialog(name) {
+  const s = robot(name), c = s.claim && !s.claim.expired ? s.claim : null;
+  const note = h("input", {type: "text", placeholder: "what you are doing, e.g. walk policy test", style: "width:100%"});
+  const hours = h("select", {}, ...[1, 2, 4, 8].map(n => h("option", {value: n, selected: n === 4}, n + " h")));
+  const [forceL, force] = c && !c.mine ? check("Take it over - I asked " + c.who) : [null, null];
+  modal("Claim " + name, h("div", {},
+    h("p", {}, "Tells everybody that you are using this robot: their deploys and policy pushes stop and name you. A stop always works. The claim ends by itself."),
+    c && !c.mine ? h("div", {class: "note fail"}, "Already in use by " + c.who + (c.note ? " (" + c.note + ")" : "") + ", for " + ago(c.age_s) + ".") : null,
+    h("label", {class: "f"}, "Note", note), h("label", {class: "f"}, "For", hours), forceL),
+    guarded("Claim", "primary", [force], () => { closeModal(); act({action: "claim", robot: name, note: note.value, hours: parseFloat(hours.value), force: !!(force && force.checked)}); }));
+}
+function backupDialog(name) {
+  const label = h("input", {type: "text", placeholder: "e.g. Dana's intercept build", style: "width:100%"});
+  modal("Back up " + name, h("div", {},
+    h("p", {}, "Copies the robot software, its configuration and the service files into a backup on the robot itself (~/.bh-backups). The robot keeps running."),
+    h("label", {class: "f"}, "Label", label),
+    h("p", {class: "muted small"}, "Not included: logs, and system settings outside the home directory.")),
+    h("button", {class: "primary", onclick: () => { closeModal(); act({action: "backup", robot: name, label: label.value}); }}, "Back up"));
+}
+async function restoreDialog(name) {
+  const s = robot(name), res = await act({action: "list_backups", robot: name});
+  if (!res) return;
+  const list = res.backups || [];
+  if (!list.length) { modal("Restore " + name, h("p", {}, "There is no backup on this robot. Back up makes one (and Deploy can make one on the way)."), []); return; }
+  const radios = list.map((b, i) => h("input", {type: "radio", name: "bk", value: b.id, checked: i === 0}));
+  const rows = list.map((b, i) => h("label", {class: "c"}, radios[i], h("span", {}, h("b", {}, b.id), " - " + (b.label || "no label") + ", by " + (b.who || "?") + ", " + ago(b.age_s) + " ago, " + b.mb + " MB")));
+  const [gateNodes, gate] = claimGate(s, "restore");
+  const [limpL, limp] = limpGate(name);
+  modal("Restore " + name, h("div", {}, ...rows,
+    h("div", {class: "note warn"}, "Replaces what is on the robot now with the backup. The robot software stops and is not started again."),
+    gateNodes, limpL),
+    guarded("Restore", "primary", [gate, limp], () => { const b = radios.find(r => r.checked); closeModal(); act({action: "restore", robot: name, backup: b ? b.value : "", ignore_claim: !!(gate && gate.checked)}); }));
+}
+function gamepadDialog(name) {
+  const s = robot(name), fig = robotFigure(), cap = h("div", {class: "ledcap"});
+  renderLED(fig, cap, s);
+  const k = t => h("span", {class: "key"}, t);
+  const live = setInterval(() => renderLED(fig, cap, robot(name)), 1000);
+  const body = h("div", {style: "display:grid;grid-template-columns:1fr 120px;gap:12px"},
+    h("ol", {},
+      h("li", {}, "Robot software running, robot standing: hold ", k("STAND"), " on the robot for 2 s. Its LED should be white (initial) - then it does nothing on its own."),
+      h("li", {}, "The gamepad talks to the robot directly (its receiver is on the robot), not to this computer."),
+      h("li", {}, "Hold ", k("LT"), " and press ", k("+"), ". The robot says \"Remote control activated\" and its LED blinks slowly."),
+      h("li", {}, k("left stick"), " walk forward / sideways, ", k("right stick ←→"), " turn, ", k("D-pad ↑"), " stand still, ", k("LB"), " kick, ", k("D-pad ←/→"), " wave."),
+      h("li", {}, "Done: hold ", k("LT"), " and press ", k("−"), ". The robot says \"Remote control deactivated\"."),
+      h("li", {class: "muted"}, "Emergency: Stop on the card or STOP ALL makes the robot limp at once.")),
+    h("div", {class: "figure"}, fig, cap));
+  modal("Drive " + name + " with the gamepad", body, []);
+  const obs = new MutationObserver(() => { if (!$("modal").classList.contains("open")) { clearInterval(live); obs.disconnect(); } });
+  obs.observe($("modal"), {attributes: true});
+}
+
+// ---------------------------------------------------------------- policies
+function fitChips(f, m) {
+  const box = h("div", {class: "fits"});
+  if (f.error) { box.append(h("span", {class: "chip fail"}, f.error)); return box; }
+  for (const [slot, problem] of Object.entries((f.fits || {})[m] || {})) {
+    if (problem === "not used for this robot type") continue;
+    box.append(h("span", {class: "chip " + (problem ? "" : "ok"), title: problem || "fits"}, (problem ? "✗ " : "✓ ") + slot));
+  }
+  return box;
+}
+function pfile(name, info, m) {
+  const e = h("div", {class: "pfile", draggable: "true", title: "Drag onto a slot"}, h("div", {class: "fn"}, name),
+    info ? h("div", {class: "muted small"}, (info.signature || "") + (info.kb != null ? " - " + info.kb + " kB" : "")) : null, info ? fitChips(info, m) : null);
+  e.ondragstart = ev => { ev.dataTransfer.setData("text/plain", name); ev.dataTransfer.effectAllowed = "copy"; };
+  return e;
+}
+function renderPolicies() {
+  if (!META || !META.policies) return;
+  const models = Object.keys(META.policies.models);
+  if (!model) model = (ST && ST.robots[0] && ST.robots[0].model) || models[0];
+  const seg = $("modelSeg"); seg.textContent = "";
+  for (const m of models) seg.append(h("button", {class: m === model ? "on" : "", onclick: () => { model = m; renderPolicies(); }}, m.toUpperCase()));
+  const bench = $("bench"); bench.textContent = "";
+  if (!META.uploads.length) bench.append(h("div", {class: "muted small"}, "Nothing dropped yet."));
+  for (const u of META.uploads) bench.append(pfile(u.name, u, model));
+  const repo = $("repoFiles"); repo.textContent = "";
+  for (const [sub, files] of Object.entries(META.policies.files)) for (const f of files) repo.append(pfile(f, null, model));
+  const slots = $("slots"); slots.textContent = "";
+  for (const sl of META.policies.models[model]) {
+    const shared = !sl.sim.length;
+    const tile = h("div", {class: "slot" + (sl.problems.length ? " bad" : "")},
+      h("h3", {}, sl.key, h("span", {class: "muted small"}, sl.size)),
+      h("div", {class: "muted small"}, sl.what),
+      h("div", {class: "row"}, h("span", {class: "muted"}, "Real robots"), h("span", {}, sl.robot.join(", ") || "-")),
+      h("div", {class: "row"}, h("span", {class: "muted"}, "Simulator"), h("span", {}, shared ? "same as the robots" : sl.sim.join(", "))),
+      ...sl.problems.map(p => h("div", {class: "chip fail", style: "white-space:normal;margin-top:6px"}, p)),
+      h("div", {class: "muted small", style: "margin-top:6px"}, "Drop a file here"));
+    tile.ondragover = ev => { ev.preventDefault(); tile.classList.add("over"); };
+    tile.ondragleave = () => tile.classList.remove("over");
+    tile.ondrop = ev => { ev.preventDefault(); tile.classList.remove("over"); const f = ev.dataTransfer.getData("text/plain"); if (f) useDialog(f, sl); };
+    slots.append(tile);
+  }
+  const pa = $("polActions"); pa.textContent = "";
+  pa.append(h("button", {onclick: () => act({action: "sim", model})}, "Try in the simulator (" + model.toUpperCase() + ")"));
+  if (ST) for (const r of ST.robots.filter(r => r.model === model && r.reachable)) pa.append(h("button", {onclick: () => pushDialog(r.name)}, "Send to " + r.name + "…"));
+}
+function useDialog(file, sl) {
+  const info = (META.uploads || []).find(u => u.name === file);
+  const problem = info ? (info.fits || {})[model] && info.fits[model][sl.key] : null;
+  const scope = h("select", {}, h("option", {value: "sim"}, "the simulator only (try it first)"), h("option", {value: "robot"}, "the real robots"), h("option", {value: "all"}, "both"));
+  const sharedNote = h("div", {class: "note info"}, "This slot has no separate copy for the simulator: 'real robots' also changes what the simulator uses.");
+  sharedNote.hidden = !!sl.sim.length;
+  const ok = h("button", {class: "primary", disabled: !!problem, onclick: () => { closeModal(); act({action: "policy_use", slot: sl.key, file, model, scope: scope.value}).then(() => setTimeout(loadMeta, 1500)); }}, "Use it");
+  modal("Use " + file + " for " + sl.key + " (" + model.toUpperCase() + ")", h("div", {},
+    problem ? h("div", {class: "note fail"}, "Does not fit: " + problem + ". The observation and action layout is built in C++; a different size needs code changes (Docs/policies.md).")
+            : h("div", {class: "note info"}, info ? "Fits this slot (" + info.signature + ")." : "The size is checked before anything is changed."),
+    h("label", {class: "f"}, "Use it in", scope), sharedNote,
+    h("p", {class: "muted small"}, "Changes the configuration files in this checkout (like bh policy use). The robots get it with Deploy or Send policies.")), ok);
+}
+async function upload(files) {
+  for (const f of files) {
+    if (!/\.onnx$/i.test(f.name)) { toast(f.name + ": only .onnx files"); continue; }
+    toast("uploading " + f.name + "…");
+    try {
+      const r = await fetch("/api/upload?t=" + encodeURIComponent(token) + "&name=" + encodeURIComponent(f.name), {method: "POST", body: f});
+      const j = await r.json(); toast(j.error || f.name + " ready - drag it onto a slot");
+    } catch (e) { toast("upload failed"); }
+  }
+  loadMeta();
+}
+const drop = $("drop");
+drop.onclick = () => $("fileInput").click();
+$("fileInput").onchange = e => upload([...e.target.files]);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); upload([...e.dataTransfer.files]); };
+
+// ---------------------------------------------------------------- activity drawer
+let following = null, consoleLines = 0, consoleJob = null;
+function follow(id) { following = id; $("drawer").classList.add("open"); $("drawerToggle").textContent = "hide ▾"; pollJob(); }
+$("drawerHead").onclick = () => { const d = $("drawer"); d.classList.toggle("open"); $("drawerToggle").textContent = d.classList.contains("open") ? "hide ▾" : "show ▴"; };
+function renderJobs(st) {
+  const jobs = (st.jobs || []).slice().reverse(), running = jobs.filter(j => j.state === "running");
+  const sum = $("drawerSummary"); sum.textContent = "";
+  if (running.length) sum.append(h("span", {class: "spin"}), " " + running.map(j => j.title).join(", "));
+  else if (jobs.length) sum.append(jobs[0].title + ": " + (jobs[0].state === "ok" ? "done" : "FAILED"));
+  else sum.append((st.messages || []).slice(-1)[0] || "nothing yet");
+  if (!changed("jobs", jobs.map(j => [j.id, j.state, following]))) return;
+  const list = $("jobList"); list.textContent = "";
+  for (const j of jobs) list.append(h("div", {class: j.id === following ? "sel" : "", onclick: () => follow(j.id)},
+    j.state === "running" ? h("span", {class: "spin"}) : h("span", {class: j.state === "ok" ? "chip ok" : "chip fail"}, j.state === "ok" ? "done" : "failed"), " ", j.title,
+    h("div", {class: "muted small"}, new Date(j.started * 1000).toLocaleTimeString())));
+  if (!jobs.length) list.append(h("div", {class: "muted"}, "Deploys, scans and other jobs appear here."));
+  if (following === null && running.length) follow(running[0].id);
+}
+async function pollJob() {
+  if (following === null) return;
+  if (consoleJob !== following) { $("console").textContent = ""; consoleLines = 0; consoleJob = following; }
+  let j;
+  try { j = await (await fetch("/api/job?t=" + encodeURIComponent(token) + "&id=" + following + "&since=" + consoleLines)).json(); } catch (e) { return; }
+  if (j.error || j.id !== consoleJob) return;
+  const pre = $("console"), atEnd = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 30;
+  for (const line of j.text) {
+    const cls = /\[FAIL\]|^error|FAILED|unexpected error/.test(line) ? "fail" : /\[warn\]/.test(line) ? "warn" : /\[ ok \]/.test(line) ? "ok" : /^(==|\$ bh)/.test(line) ? "head" : "";
+    pre.append(h("span", {class: cls}, line + "\n"));
+  }
+  consoleLines = j.first + j.text.length;
+  if (atEnd) pre.scrollTop = pre.scrollHeight;
+  if (j.state !== "running" && j.text.length === 0 && pollJob.lastState === "running" && /policy|use /.test(j.title)) loadMeta();
+  pollJob.lastState = j.state;
+}
+setInterval(() => { if ($("drawer").classList.contains("open")) pollJob(); }, 700);
+
+// ---------------------------------------------------------------- help
+const SWATCH = {"blue": "rgb(0,0,255)", "magenta": "rgb(255,0,255)", "white": "rgb(255,255,255)", "light blue": "rgb(0,140,255)", "yellow": "rgb(255,255,0)",
+                "green": "rgb(0,255,0)", "red": "rgb(255,0,0)", "orange": "rgb(255,140,0)"};
+function renderHelp(st) {
+  const box = $("help"); box.textContent = "";
+  const table = h("table", {class: "legend"});
+  for (const [name, meaning] of st.legend) {
+    const colour = Object.keys(SWATCH).sort((a, b) => b.length - a.length).find(c => name.includes(c));
+    const blink = /fast blinking/.test(name) ? "fast" : /blinking|flash/.test(name) ? "slow" : "";
+    const dot = svg('<svg width="18" height="18" viewBox="0 0 18 18"><circle class="led ' + blink + '" cx="9" cy="9" r="7" stroke="var(--robot-line)"/></svg>');
+    const c = dot.querySelector("circle"), on = colour ? SWATCH[colour] : "rgb(180,180,180)";   // grey = any colour
+    c.setAttribute("fill", on); c.style.setProperty("--led-on", on); c.style.setProperty("--led-off", "var(--chip)");
+    table.append(h("tr", {}, h("td", {}, dot), h("td", {}, h("b", {}, name)), h("td", {class: "muted"}, meaning)));
+  }
+  const how = (title, ...body) => h("details", {}, h("summary", {}, title), ...body.map(b => typeof b === "string" ? h("p", {}, b) : b));
+  box.append(
+    h("div", {class: "panel"}, h("h2", {}, "The back LED"), h("p", {class: "muted small"}, "Each robot card mirrors the LED as the robot software reports it (it ignores flashes shorter than half a second). Docs/leds.md has the details."), table),
+    h("div", {class: "panel"}, h("h2", {}, "How do I…"),
+      how("…test a new walk policy?", "Policies tab: drop the .onnx file, drag it onto 'walk', choose 'the simulator only', then 'Try in the simulator'. When it walks well, drag it onto 'walk' again with 'the real robots', and use 'Send to ROBOT…' (or Deploy). Arm the guard or keep the robot held for the first steps."),
+      how("…use a robot that others use too?", "Claim it (card → Claim) with a note. Back up before you deploy (Deploy has the checkbox). When you are done: Restore the backup, start the robot, and Release it."),
+      how("…drive a robot myself?", "Card → Drive with gamepad shows the buttons. The LED blinks slowly while the gamepad is in control."),
+      how("…stop a robot?", "Hard: Stop on the card, STOP ALL at the top, or the robot's red button - the robot goes limp at once, so hold it. Soft: with the laptop guard armed (Deploy → 'Arm the laptop guard') STOP makes it stand still."),
+      how("…find out why a robot does not work?", "Scan (read-only) answers 'will it run?' and names what is wrong. Log shows the last 400 lines the software wrote, Crash dump the report of the last crash."),
+      how("…do the same from the command line?", h("p", {}, "Every button runs the same code as a bh command, shown at the top of its output in Activity. bh --help lists them."))),
+    h("div", {class: "panel", "data-anchor": "policies"}, h("h2", {}, "Why must a policy fit its slot?"),
+      h("p", {}, "The robot builds the network's input vector in C++ (WalkingEngine, GetUpEngine) and reads its output the same way. A file with another input or output size would read garbage: the robot only checks the sizes with assertions, and Release builds have none. So the sizes are checked here, before a deploy, and before sending a policy."),
+      h("p", {class: "muted small"}, "A new observation layout needs code changes and new numInput/numOutput values - see Docs/policies.md.")));
+}
+for (const a of document.querySelectorAll("[data-help]")) a.onclick = e => { e.preventDefault(); showTab("help"); };
+
+// ---------------------------------------------------------------- refresh loop
+let helpDone = false;
 async function refresh() {
   let st;
   try { st = await (await fetch("/api/state?t=" + encodeURIComponent(token))).json(); }
-  catch (e) { $("game").textContent = "Dashboard process is not running (bh dash)."; return; }
+  catch (e) { $("game").textContent = "The dashboard process is not running (start it with: bh dash)."; return; }
   if (st.error) { $("game").textContent = st.error; return; }
-  renderGame(st); renderBars(st); renderRobots(st);
+  const jobsBefore = ST ? (ST.jobs || []).filter(j => j.state === "running").length : 0;
+  ST = st;
+  renderGame(st); renderBars(st); renderRobots(st); renderJobs(st);
+  $("me").textContent = "you: " + st.me;
   $("stopAll").hidden = st.passive;
-  const messages = (st.messages || []).join("\n") || "nothing yet";
-  if ($("messages").textContent !== messages) $("messages").textContent = messages;
-  if (!legendDone) { for (const [led, meaning] of st.legend) { const tr = el("tr"); tr.append(el("td", "", led), el("td", "muted", meaning)); $("legend").append(tr); } legendDone = true; }
+  if (!helpDone) { renderHelp(st); helpDone = true; }
+  if (jobsBefore && !(st.jobs || []).some(j => j.state === "running") && $("tab-policies").classList.contains("active")) loadMeta();
 }
 $("stopAll").onclick = () => act({action: "stop_all"});
 refresh(); setInterval(refresh, 1000);
