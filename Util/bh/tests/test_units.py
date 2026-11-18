@@ -85,9 +85,21 @@ class Policies(unittest.TestCase):
         text = "".join(p.read_text(encoding="utf-8", errors="replace")
                        for d in ("Modules/MotionControl/WalkingEngine", "Modules/MotionControl/GetUpEngine")
                        for p in (src / d).rglob("*.h"))
-        for word in ("walkNeuronalNetworkParameters", "ballNetworkParameters", "oldBallNetworkParameters", "modelName",
-                     "kickModel", "numInput", "numOutput", "policyName", "policyNameFast", "numInputFast", "numOutputFast"):
+        words = {w for s in policy.SLOTS for a in (s.attr, s.n_in, s.n_out) for w in a.split(".")}
+        self.assertTrue({"walkNeuronalNetworkParameters", "ballNetworkParameters", "kickModel", "policyNameFast"} <= words)
+        for word in sorted(words):
             self.assertRegex(text, r"\b%s\b" % word)
+
+    def test_every_slot_is_configured(self):
+        """A slot whose attribute is in no configuration file would be skipped by the check without a word
+        (a new slot added to policy.SLOTS before its parameters are in the .cfg files, or a typo)."""
+        for slot in policy.SLOTS:
+            configured = [p for p in policy.cfg_files(slot.cfg) if core.cfg_get(core.read_cfg(p), slot.attr) is not None]
+            self.assertTrue(configured, "slot %s: %s is in no copy of %s" % (slot.key, slot.attr, slot.cfg))
+            for p in configured:
+                cfg = core.read_cfg(p)
+                for size in (slot.n_in, slot.n_out):
+                    self.assertIsNotNone(policy._int(core.cfg_get(cfg, size)), "%s: %s missing" % (p, size))
 
 
 class GameControllerProtocol(unittest.TestCase):

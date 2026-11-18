@@ -90,70 +90,93 @@
   .state.fail { color: var(--fail); background: var(--failbg); } .state.off { color: var(--muted); background: var(--chip); }
   .state.held { color: var(--ink); background: var(--chip); border-color: var(--held); }
 
-  /* robot cards */
-  #robots { padding: 14px 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(390px, 1fr)); align-items: start; }
+  /* robot cards: name and state, who uses it, LED and five numbers, what needs attention, guard, buttons */
+  #robots { padding: 14px 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); align-items: start; }
   @media (max-width: 480px) { #robots { grid-template-columns: 1fr; } }
-  .card { background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; box-shadow: var(--shadow); }
-  .card.sev-warn { border-left-color: var(--warnfill); } .card.sev-fail { border-left-color: var(--fail); }
-  .card.offline .card-body, .card.offline .ledcap { opacity: .65; }
-  .card-head { display: grid; gap: 6px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-top: 4px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; box-shadow: var(--shadow); display: grid; gap: 10px; }
+  .card.sev-warn { border-top-color: var(--warnfill); } .card.sev-fail { border-top-color: var(--fail); }
+  .card.offline .card-body { opacity: .6; }
   .row1 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-  .row1 .name { font-size: 22px; font-weight: 800; margin-right: 2px; line-height: 1.1; }
-  .row1 .power { margin-left: auto; }
-  .row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
-  .owner { font-size: 12.5px; font-weight: 600; }
-  .card-body { display: grid; grid-template-columns: 124px 1fr; gap: 14px; margin-top: 10px; }
-  .figure { text-align: center; }
-  .figure > svg { width: 100px; height: 144px; display: block; margin: 0 auto; }
-  .ledcap { font-size: 12.5px; margin-top: 2px; }
-  .ledcap b { display: block; font-size: 14px; }
-  .ledcap .chip { margin-top: 4px; white-space: normal; border-radius: 8px; padding: 3px 7px; align-items: flex-start; text-align: left; }
-  .ledcap .chip svg { margin-top: 2px; }
+  .row1 .name { font-size: 20px; font-weight: 800; margin-right: 2px; line-height: 1.1; }
+  .row1 .power { margin-left: auto; display: inline-flex; gap: 5px; align-items: center; }
+  .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  /* who uses the robot: the first thing to check before touching it */
+  .ownbar { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border-radius: 9px; background: var(--chip); font-size: 13px; }
+  .ownbar > svg { width: 18px; height: 18px; flex: none; }
+  .ownbar .who { min-width: 0; flex: 1; line-height: 1.25; }
+  .ownbar .who b { overflow-wrap: anywhere; }
+  .ownbar .who span { display: block; font-size: 12px; color: var(--muted); }
+  .ownbar button { min-height: 28px; padding: 3px 10px; white-space: nowrap; }
+  .ownbar.mine { background: var(--infobg); } .ownbar.mine > svg, .ownbar.mine .who b { color: var(--info); }
+  .ownbar.other { background: var(--warnbg); } .ownbar.other > svg, .ownbar.other .who b { color: var(--warn); }
+  .card-body { display: grid; grid-template-columns: 92px 1fr; gap: 12px; align-items: start; }
+  .figure { text-align: center; min-width: 0; }
+  .figure > svg { width: 60px; height: 90px; display: block; margin: 0 auto; }
+  .ledcap { font-size: 12px; margin-top: 2px; line-height: 1.3; }
+  .ledcap b { display: block; font-size: 12.5px; }
+  .ledcap .muted { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .ledcap .chip { margin-top: 4px; white-space: normal; border-radius: 8px; padding: 2px 6px; }
   .led { transition: fill .2s; }
   .led.slow { animation: blink 1s steps(1) infinite; }
   .led.fast { animation: blink .25s steps(1) infinite; }
   @keyframes blink { 0% { fill: var(--led-on); } 50% { fill: var(--led-off); } }
   @media (prefers-reduced-motion: reduce) { .led.slow { animation-duration: 2s; } .led.fast { animation-duration: 1s; } }
-  .gauges { display: grid; gap: 9px; align-content: start; }
-  .gauge { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 2px 7px; }
-  .gauge svg { width: 17px; height: 17px; color: var(--muted); }
-  .gauge .lab { font-size: 12.5px; color: var(--muted); }
-  .gauge .val { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; display: inline-flex; gap: 4px; align-items: center; }
-  .gauge .val.warn { color: var(--warn); } .gauge .val.fail { color: var(--fail); }
-  .gauge .bar2 { grid-column: 2 / 4; }
-  .meter { height: 7px; border-radius: 4px; background: var(--track); overflow: hidden; }
-  .meter i { display: block; height: 100%; background: var(--neutral); border-radius: 4px; }
-  .meter i.warn { background: var(--warnfill); } .meter i.fail { background: var(--fail); } .meter i.none { background: transparent; }
-  .wifi { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
-  .wifi i { width: 6px; background: var(--track); border-radius: 1px; } .wifi i.on { background: var(--neutral); } .wifi.warn i.on { background: var(--warnfill); }
-  .issues { display: grid; gap: 5px; margin-top: 12px; }
-  details.issue { border-radius: 8px; padding: 4px 9px; background: var(--chip); border: 1px solid transparent; }
-  details.issue.warn { background: var(--warnbg); border-color: color-mix(in srgb, var(--warnfill) 35%, transparent); }
-  details.issue.fail { background: var(--failbg); border-color: color-mix(in srgb, var(--fail) 35%, transparent); }
-  details.issue.info { background: var(--infobg); }
-  details.issue summary { cursor: pointer; list-style: none; display: flex; gap: 7px; align-items: flex-start; font-weight: 600; }
+  /* five numbers as small tiles: grey while normal, coloured with an icon when not */
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat { display: grid; grid-template-columns: 18px 1fr; gap: 0 6px; align-items: center; padding: 5px 7px; border-radius: 8px; background: var(--chip); min-width: 0; }
+  .stat > svg { width: 16px; height: 16px; color: var(--muted); grid-row: span 2; }
+  .stat .val { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat .lab { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stat.warn { background: var(--warnbg); } .stat.warn > svg, .stat.warn .val { color: var(--warn); }
+  .stat.fail { background: var(--failbg); } .stat.fail > svg, .stat.fail .val { color: var(--fail); }
+  .stats .wide { grid-column: 1 / -1; }
+  .issues { display: grid; gap: 4px; }
+  details.issue { border-radius: 8px; padding: 4px 9px; background: var(--chip); }
+  details.issue.warn { background: var(--warnbg); } details.issue.fail { background: var(--failbg); } details.issue.info { background: var(--infobg); }
+  details.issue summary { cursor: pointer; list-style: none; display: flex; gap: 7px; align-items: flex-start; font-weight: 600; font-size: 13px; }
   details.issue summary::-webkit-details-marker { display: none; }
-  details.issue summary svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }
-  details.issue summary .more { margin-left: auto; color: var(--muted); font-weight: 400; font-size: 12px; white-space: nowrap; }
-  details.issue[open] summary .more { visibility: hidden; }
+  details.issue summary svg { width: 15px; height: 15px; flex: none; margin-top: 2px; }
+  details.issue summary .chev { margin-left: auto; color: var(--muted); font-weight: 400; transition: transform .15s; }
+  details.issue[open] summary .chev { transform: rotate(90deg); }
   details.issue.warn summary { color: var(--warn); } details.issue.fail summary { color: var(--fail); } details.issue.info summary { color: var(--info); }
-  details.issue p { margin: 4px 0 2px 23px; }
-  .guardbox { margin-top: 12px; padding: 9px 11px; border-radius: 10px; border: 2px solid var(--line); display: grid; gap: 7px; }
+  details.issue p { margin: 4px 0 2px 22px; font-size: 13px; }
+  .guardbox { padding: 6px 6px 6px 10px; border-radius: 9px; border: 1.5px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; }
   .guardbox.released { border-color: var(--ok); background: var(--okbg); }
-  .guardbox .ghead { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  .guardbox > b { display: inline-flex; gap: 6px; align-items: center; }
+  .guardbox .end { margin-left: auto; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  .seg button { border: 0; border-radius: 0; min-width: 64px; }
+  .seg button { border: 0; border-radius: 0; min-width: 58px; }
   .seg button + button { border-left: 1px solid var(--line); }
-  .busy { margin-top: 10px; font-size: 13px; color: var(--info); font-weight: 600; display: flex; gap: 7px; align-items: center; }
-  .actions { display: grid; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
-  .group { display: grid; grid-template-columns: 78px 1fr; gap: 8px; align-items: center; }
-  .glabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-  .gbtns { display: flex; flex-wrap: wrap; gap: 6px; }
-  details.more { margin-top: 10px; } details.more > summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+  .busy { font-size: 13px; color: var(--info); font-weight: 600; display: flex; gap: 7px; align-items: center; }
+  /* buttons: three everyday ones with a word that says what they do, the rest in "More" */
+  .toolbar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .tool { display: grid; justify-items: center; gap: 1px; padding: 7px 4px 6px; min-height: 58px; border-radius: 9px; text-align: center; line-height: 1.15; }
+  .tool > svg { width: 20px; height: 20px; margin-bottom: 2px; }
+  .tool b { font-size: 13px; }
+  .tool small { font-size: 11px; color: var(--muted); }
+  .tool.primary small { color: inherit; opacity: .85; }
+  .menuwrap { position: relative; }
+  .menuwrap > .tool { width: 100%; }
+  .menu { position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 4; width: 290px; background: var(--card); border: 1px solid var(--line); border-radius: 11px;
+          box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 5px; display: grid; gap: 1px; }
+  .menu .sep { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 7px 9px 2px; }
+  .menu button { display: grid; grid-template-columns: 22px 1fr; gap: 0 9px; align-items: center; text-align: left; border: 0; background: none; border-radius: 7px; padding: 6px 9px; }
+  .menu button:hover:not(:disabled), .menu button:focus-visible { background: var(--chip); }
+  .menu button > svg { width: 18px; height: 18px; grid-row: span 2; color: var(--muted); }
+  .menu button b { font-size: 13.5px; } .menu button small { font-size: 12px; color: var(--muted); }
+  details.more > summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
   .kv { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; font-size: 12.5px; margin-top: 6px; }
   .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow-wrap: anywhere; }
   pre { margin: 6px 0 0; padding: 8px; background: var(--chip); border-radius: 6px; font: 12px/1.4 ui-monospace, Consolas, monospace;
         white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
+  /* "how sharing works", until dismissed */
+  .howto { margin: 12px 16px 0; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
+           display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+  .howto > button { margin-left: auto; }
+  .howto .hstep { flex: 1 1 250px; display: grid; grid-template-columns: 30px 1fr; gap: 0 8px; align-items: center; font-size: 12.5px; line-height: 1.3; }
+  .howto .hstep > svg { width: 26px; height: 26px; padding: 4px; border-radius: 50%; background: var(--infobg); color: var(--info); grid-row: span 2; }
+  .howto .hstep b { font-size: 13px; }
+  .howto .hstep span { color: var(--muted); }
 
   /* policies */
   .pol { padding: 14px 16px; display: grid; gap: 14px; grid-template-columns: minmax(280px, 360px) 1fr; }
@@ -162,6 +185,7 @@
   .panel h2 { font-size: 15px; margin: 0 0 8px; }
   .steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 16px 0; }
   .step { display: flex; gap: 7px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px 4px 4px; font-size: 13px; }
+  .steps .arrow { color: var(--muted); align-self: center; }
   .step b { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 12px; }
   .drop { display: block; width: 100%; border: 2px dashed var(--line); border-radius: 10px; padding: 18px 10px; text-align: center; cursor: pointer; color: var(--muted); background: none; }
   .drop.over { border-color: var(--accent); color: var(--accent); background: var(--chip); }
@@ -174,6 +198,9 @@
   .slot { border: 2px solid var(--line); border-radius: 11px; padding: 10px 12px; min-height: 130px; }
   .slot.over { border-color: var(--accent); background: var(--chip); }
   .slot.bad { border-color: var(--fail); }
+  .slot.add { border-style: dashed; display: grid; place-items: center; text-align: center; color: var(--muted); background: none; width: 100%; font: inherit; cursor: pointer; }
+  .slot.add:hover { color: var(--accent); border-color: var(--accent); }
+  .slot.add svg { width: 26px; height: 26px; }
   .slot h3 { margin: 0; font-size: 15px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
   .slot .row { display: grid; grid-template-columns: 74px 1fr; gap: 6px; font-size: 12.5px; margin-top: 4px; }
   .slot .row span:last-child { overflow-wrap: anywhere; font-weight: 600; }
@@ -182,8 +209,14 @@
   #drawer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -4px 18px rgba(0,0,0,.08); }
   #drawerHead { display: flex; width: 100%; gap: 10px; align-items: center; padding: 8px 16px; border: 0; border-radius: 0; background: none; text-align: left; min-height: 40px; }
   #drawerHead .title { font-weight: 700; }
-  #drawerBody { display: none; grid-template-columns: 240px 1fr; height: 38vh; border-top: 1px solid var(--line); }
+  #drawerBody { display: none; grid-template-columns: 240px 1fr; height: var(--drawer-h, 38vh); border-top: 1px solid var(--line); }
   #drawer.open #drawerBody { display: grid; }
+  /* drag the top edge of the open drawer to resize it (arrow keys when focused, double-click for the default) */
+  #drawerGrip { display: none; position: absolute; left: 0; right: 0; top: -5px; height: 10px; cursor: ns-resize; touch-action: none; z-index: 1; }
+  #drawer.open #drawerGrip { display: block; }
+  #drawerGrip::after { content: ""; position: absolute; left: 50%; top: 3px; width: 44px; height: 4px; margin-left: -22px; border-radius: 2px; background: var(--line); }
+  #drawerGrip:hover::after, #drawerGrip:focus-visible::after, #drawer.resizing #drawerGrip::after { background: var(--accent); }
+  #drawer.resizing { user-select: none; }
   #jobList { overflow: auto; border-right: 1px solid var(--line); }
   #jobList > div { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 13px; }
   #jobList > div.sel { background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); }
@@ -244,18 +277,19 @@
 <section class="tab active" id="tab-robots">
   <div class="bar" id="guardBar" hidden></div>
   <div class="bar" id="gcBar" hidden></div>
+  <div class="howto" id="howto" hidden></div>
   <div id="robots"></div>
   <div class="empty" id="loading">Connecting to <code>bh dash</code>…</div>
   <div class="empty" id="empty" hidden>No robots registered. Add one with <code>bh robot onboard NAME --id N</code>.</div>
 </section>
 
 <section class="tab" id="tab-policies">
-  <div class="steps">
-    <span class="step"><b>1</b>Drop a policy file</span>
-    <span class="step"><b>2</b>Drag it onto a slot, "simulator only"</span>
-    <span class="step"><b>3</b>Try it in the simulator</span>
-    <span class="step"><b>4</b>Drag it again, "real robots"</span>
-    <span class="step"><b>5</b>Send it to a robot</span>
+  <div class="steps" aria-label="How to try a policy">
+    <span class="step"><b>1</b>Drop an .onnx file</span><span class="arrow">→</span>
+    <span class="step"><b>2</b>Drag it onto a slot: simulator</span><span class="arrow">→</span>
+    <span class="step"><b>3</b>Try in the simulator</span><span class="arrow">→</span>
+    <span class="step"><b>4</b>Drag again: real robots</span><span class="arrow">→</span>
+    <span class="step"><b>5</b>Send to a robot</span>
   </div>
   <div class="pol">
     <div class="panel">
@@ -284,6 +318,7 @@
 </section>
 
 <div id="drawer">
+  <div id="drawerGrip" role="separator" aria-orientation="horizontal" aria-label="Resize Activity" tabindex="0" title="Drag to resize - double-click for the default size"></div>
   <button id="drawerHead" aria-expanded="false" aria-controls="drawerBody"><span class="title">Activity</span><span id="drawerSummary" class="muted small" style="display:flex;gap:6px;align-items:center"></span><span style="margin-left:auto" class="muted small" id="drawerToggle">show ▴</span></button>
   <div id="drawerBody"><div id="jobList"></div><pre id="console" aria-live="off"></pre></div>
 </div>
@@ -327,6 +362,22 @@ const ICON = {
   play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg>',
   person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5"/></svg>',
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10v-6z"/></svg>',
+  deploy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>',
+  policy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="7" r="2"/><circle cx="5" cy="17" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 7.5l3 3.5M7 16.5l3-3.5M7 7l3-1.5M7 17l3 1.5M14 12h3M14 5.8l3.4 4.7M14 18.2l3.4-4.7"/></svg>',
+  restart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></svg>',
+  more: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+  gamepad: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8h12a4 4 0 0 1 4 4.5l-.6 4a2.5 2.5 0 0 1-4.4 1.2L15 16H9l-2 1.7a2.5 2.5 0 0 1-4.4-1.2l-.6-4A4 4 0 0 1 6 8z"/><path d="M7 11v3M5.5 12.5h3M16 12h.01M18 13.5h.01"/></svg>',
+  flag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+  save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h11l3 3v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M7 3v5h8V3M7 21v-7h10v7"/></svg>',
+  restore: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v5h5M12 8v4l3 2"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
+  file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/></svg>',
+  bug: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="7" y="7" width="10" height="13" rx="5"/><path d="M12 11v9M7 12H3M21 12h-4M7 17l-3 2M17 17l3 2M8 8L5 5M16 8l3-3"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  unlock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  hand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4.5a1.5 1.5 0 0 1 3 0V11M14 10.5V6a1.5 1.5 0 0 1 3 0v8a7 7 0 0 1-7 7h-.5a6 6 0 0 1-4.6-2.2L3.3 16a1.6 1.6 0 0 1 2.4-2.1L8 16"/></svg>',
+  stand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="4.5" r="2"/><path d="M12 7v7M8 10h8M12 14l-3 7M12 14l3 7"/></svg>',
 };
 /** An icon with a default size (CSS may override it), so that an unstyled place never shows it huge. */
 const icon = name => { const e = svg(ICON[name]); e.setAttribute("width", "16"); e.setAttribute("height", "16"); return e; };
@@ -358,7 +409,7 @@ let modalReturn = null;
 function modal(title, body, buttons) {
   if (!$("modal").classList.contains("open")) modalReturn = document.activeElement;
   const d = $("dialog"); d.textContent = "";
-  const cancel = h("button", {onclick: closeModal}, "Cancel");
+  const cancel = h("button", {onclick: closeModal}, [buttons].flat().filter(Boolean).length ? "Cancel" : "Close");
   d.append(h("h2", {id: "dlgTitle"}, title), body, h("div", {class: "buttons"}, cancel, buttons));
   document.documentElement.style.setProperty("--toph", document.querySelector(".top").offsetHeight + "px");
   $("modal").classList.add("open"); document.body.classList.add("modal-open");
@@ -472,11 +523,11 @@ function rgb(a) { return "rgb(" + a.join(",") + ")"; }
 /** [css on, css off, blink, title, text, stale] for a robot's LED. */
 function ledLook(s) {
   const grey = "var(--chip)";
-  if (s.reachable === false) return [grey, grey, "", "offline", "The robot does not answer."];
-  if (s.reachable == null) return [grey, grey, "", "checking...", ""];
-  if (s.service !== "active") return [grey, grey, "", "software not running", "The robot software is stopped, so nothing controls the LED. Start it to see its state here."];
+  if (s.reachable === false) return [grey, grey, "", "offline", "switched off or out of reach"];
+  if (s.reachable == null) return [grey, grey, "", "checking…", ""];
+  if (s.service !== "active") return [grey, grey, "", "LED off", "software stopped - press Start"];
   const v = s.led_view;
-  if (!v) return [grey, grey, "", "no LED report", "This robot runs software without the LED report. Deploy the current code to see its LED here; until then look at the robot (Help tab explains the colours)."];
+  if (!v) return [grey, grey, "", "LED unknown", "This robot runs software without the LED report. Deploy the current code to see its LED here; until then look at the robot (Help tab explains the colours)."];
   const stale = v.age_s != null && v.age_s > 20;
   return [rgb(v.rgb), rgb(v.rgb_off), v.blink === "steady" ? "" : v.blink, v.colour + (v.blink === "steady" ? "" : ", " + v.blink + " blinking"), v.meaning, stale];
 }
@@ -487,41 +538,40 @@ function renderLED(fig, cap, s) {
   led.setAttribute("fill", on); led.setAttribute("class", "led " + blink);
   glow.setAttribute("fill", on); glow.style.display = on.startsWith("rgb") ? "" : "none";
   cap.textContent = "";
-  cap.put(h("b", {}, title), h("span", {class: "muted"}, text),
-    stale ? h("span", {class: "chip warn", title: "No new LED report for more than 20 s"}, icon("warn"), "no new report for 20 s: is the robot software stuck?") : null);
+  cap.title = "Back LED: " + title + (text ? " - " + text : "");
+  cap.put(h("b", {}, title), text ? h("span", {class: "muted"}, text) : null,
+    stale ? h("span", {class: "chip warn", title: "No new LED report for more than 20 s: is the robot software stuck?"}, icon("warn"), "no report 20 s") : null);
 }
 
-// ---------------------------------------------------------------- gauges
-function meter(pct, level) { return h("div", {class: "meter bar2"}, h("i", {class: level || "", style: "width:" + Math.max(0, Math.min(100, pct)) + "%"})); }
-/** One gauge: icon, label and value on one line, the bar below. Only abnormal values are coloured (and get an icon). */
-function gauge(ic, label, title, bar, value, level) {
+// ---------------------------------------------------------------- the five numbers
+/** One tile: icon, value, label. Only abnormal values are coloured (and get an icon). */
+function stat(ic, label, title, value, level, wide) {
   const sev = level === "warn" || level === "fail" ? level : "";
-  return h("div", {class: "gauge", title}, svg(ICON[ic]), h("span", {class: "lab"}, label), h("span", {class: "val " + sev}, sev ? icon(sev) : null, value), bar);
+  return h("div", {class: "stat " + sev + (wide ? " wide" : ""), title}, svg(ICON[sev || ic]), h("span", {class: "val"}, value), h("span", {class: "lab"}, label));
 }
 function renderGauges(box, s) {
   box.textContent = "";
-  if (!s.reachable) { box.append(h("div", {class: "muted"}, s.reachable == null ? "Checking…" : s.error || "not reachable")); return; }
+  if (!s.reachable) { box.append(h("div", {class: "muted small"}, s.reachable == null ? "Checking…" : s.error || "not reachable")); return; }
   const lvl = s.battery_level === "ok" ? "" : s.battery_level;
-  box.append(gauge("battery", "Battery", "Battery (reported by the robot software while it runs)", s.battery != null ? meter(s.battery, lvl) : meter(0, "none"), s.battery != null ? s.battery + " %" : "unknown", lvl));
-  const t = s.max_temp, tl = t == null ? "none" : t >= 88 ? "fail" : t >= 76 ? "warn" : "";
-  box.append(gauge("joint", "Hottest joint", "Hottest joint motor (hot from 76 C, very hot from 88 C)", meter(t == null ? 0 : (t - 20) / 0.8, tl), t != null ? t + " C" : "?", tl));
-  const z = s.zones && s.zones.length ? Math.max(...s.zones) : null, zl = z == null ? "none" : z >= 85 ? "warn" : "";
-  box.append(gauge("cpu", "Computer", "Robot computer temperature (hot from 85 C)", meter(z == null ? 0 : (z - 20) / 0.8, zl), z != null ? z.toFixed(0) + " C" : "?", zl));
+  box.append(stat("battery", "battery", "Battery (reported by the robot software while it runs; warning below 40 %)", s.battery != null ? s.battery + " %" : "?", lvl));
+  const t = s.max_temp, tl = t == null ? "" : t >= 88 ? "fail" : t >= 76 ? "warn" : "";
+  box.append(stat("joint", "hottest joint", "Hottest joint motor (hot from 76 C, very hot from 88 C)", t != null ? t + " °C" : "?", tl));
+  const z = s.zones && s.zones.length ? Math.max(...s.zones) : null, zl = z != null && z >= 85 ? "warn" : "";
+  box.append(stat("cpu", "computer", "Robot computer temperature (hot from 85 C)", z != null ? z.toFixed(0) + " °C" : "?", zl));
   if (s.wifi) {
-    const q = s.wifi.dbm, bars = q >= -55 ? 4 : q >= -65 ? 3 : q >= -75 ? 2 : q >= -85 ? 1 : 0, wl = bars <= 1 ? "warn" : "";
-    const w = h("div", {class: "wifi bar2 " + wl}); for (let i = 1; i <= 4; i++) w.append(h("i", {class: i <= bars ? "on" : "", style: "height:" + (i * 25) + "%"}));
-    box.append(gauge("wifi", "Wireless", "Wireless signal of " + s.wifi.device + " (weak below -75 dBm)", w, q + " dBm", wl));
+    const q = s.wifi.dbm, wl = q < -75 ? "warn" : "";
+    box.append(stat("wifi", "wireless", "Wireless signal of " + s.wifi.device + " (weak below -75 dBm)", q + " dBm", wl));
   }
-  else box.append(gauge("wifi", "Wireless", "No wireless connection reported (cable only?)", null, h("span", {class: "muted small"}, "cable / none"), ""));
-  if (s.disk_free_gb != null) { const dl = s.disk_free_gb < 2 ? "warn" : ""; box.append(gauge("disk", "Disk", "Disk of the robot (warning below 2 GB free)", meter(s.disk_used_pct || 0, dl), s.disk_free_gb + " GB free", dl)); }
+  else box.append(stat("wifi", "wireless", "No wireless connection reported (cable only?)", "cable", ""));
+  if (s.disk_free_gb != null) box.append(stat("disk", "disk free", "Disk of the robot (warning below 2 GB free)", s.disk_free_gb + " GB", s.disk_free_gb < 2 ? "warn" : "", true));
 }
 
 // ---------------------------------------------------------------- issues with explanations
 const EXPLAIN = [
   [/robot software is not running/, "The program that controls the robot is stopped, so the robot is limp. Press Start when the robot sits or is held; it starts limp, then hold STAND on the robot for 2 s."],
-  [/crashed/, "The robot software ended with an error. Open Log and Crash dump to see why. Start runs it again."],
-  [/crash dump/, "An earlier run left a crash report on the robot. Open Crash dump to read it - it usually names the module that failed."],
-  [/battery level unknown/, "The robot software reports the battery only while it runs. If it runs and this stays unknown, Scan tells you whether the robot can write its status file."],
+  [/crashed/, "The robot software ended with an error. More → Log and Crash report show why. Start runs it again."],
+  [/crash dump/, "An earlier run left a crash report on the robot. More → Crash report shows it - it usually names the module that failed."],
+  [/battery level unknown/, "The robot software reports the battery only while it runs. If it runs and this stays unknown, More → Check robot tells you whether the robot can write its status file."],
   [/below the/, "Change the battery now: with a low battery the motors sag and the robot falls more."],
   [/change it before a game/, "Enough for short tests, not for a game."],
   [/cool down/, "Very hot motors lose strength and can be damaged. Let the robot sit (Stop makes it limp) for a few minutes."],
@@ -529,31 +579,37 @@ const EXPLAIN = [
   [/computer at/, "The robot's computer is hot. Check that its fan runs and the vents are free."],
   [/GB free/, "Old logs fill the disk. Download and delete them: bh logs NAME --download --delete (the robot goes limp meanwhile)."],
   [/calibration saved on the robot/, "Somebody calibrated this robot on the robot itself. A deploy keeps that calibration (it is rescued first); bh calib pull NAME copies it into the repository so the team has it."],
-  [/laptop guard is armed/, "This robot only moves while a laptop sends 'go'. Use the guard box below (RUN / STOP) or bh guard NAME. A normal deploy removes the guard."],
+  [/laptop guard is armed/, "This robot only moves while a laptop sends RUN. Use the guard row (RUN / STOP) or bh guard NAME. A normal deploy removes the guard."],
 ];
 // Conditions that are a deliberate set-up rather than something to fix are shown as information,
-// so that warnings keep their meaning (the guard box under the warnings shows the guard itself).
+// so that warnings keep their meaning.
 const INFO_ONLY = [/laptop guard is armed/];
+// Shown elsewhere on the card already (state badge, guard row), so not repeated in the list.
+const SHOWN_ELSEWHERE = [/robot software is not running/, /laptop guard is armed/, /^robot software crashed/];
 function explain(text) { for (const [re, t] of EXPLAIN) if (re.test(text)) return t; return "See Docs/testing-and-safety.md."; }
 function issueLevel(level, text) { return level === "warn" && INFO_ONLY.some(re => re.test(text)) ? "info" : level; }
 function issues(s) { return (s.assess || []).filter(([level]) => level !== "ok").map(([level, text]) => [issueLevel(level, text), text]); }
+/** Cut the command hint off a robot message ("... - bh start Alice"): the explanation names the button. */
+function shortIssue(text) { return text.replace(/\s+[-(]\s*bh [^)]*\)?$/, ""); }
 function renderIssues(box, s) {
   box.textContent = "";
-  const list = issues(s), rank = {fail: 0, warn: 1, info: 2};
+  const list = issues(s).filter(([, text]) => !SHOWN_ELSEWHERE.some(re => re.test(text))), rank = {fail: 0, warn: 1, info: 2};
   list.sort((a, b) => (rank[a[0]] ?? 3) - (rank[b[0]] ?? 3));
   box.hidden = !list.length;
   for (const [level, text] of list)
-    box.append(h("details", {class: "issue " + level}, h("summary", {}, icon(level === "fail" || level === "warn" ? level : "info"), h("span", {}, text), h("span", {class: "more"}, "what to do ▸")), h("p", {}, explain(text))));
+    box.append(h("details", {class: "issue " + level}, h("summary", {title: "What to do"}, icon(level === "fail" || level === "warn" ? level : "info"), h("span", {}, shortIssue(text)), h("span", {class: "chev"}, "›")),
+      h("p", {}, explain(text), text !== shortIssue(text) ? h("span", {class: "muted"}, " (" + text.slice(shortIssue(text).length).replace(/^\s*[-(]\s*|\)$/g, "") + ")") : null)));
 }
 
 // ---------------------------------------------------------------- per robot actions and dialogs
 function claimText(c) { return c.mine ? "yours" + (c.note ? ": " + c.note : "") : "in use by " + c.who + (c.note ? ": " + c.note : ""); }
-/** [severity class, word, icon] of the robot software. */
+/** [severity class, word, icon, explanation] of the robot software. */
 function softwareState(s) {
-  return s.reachable == null ? ["off", "checking…", "off"] : !s.reachable ? ["off", "offline", "off"] : s.service === "active" ? ["ok", "running", "ok"]
-       : s.service === "failed" ? ["fail", "crashed", "fail"] : ["warn", "not running", "warn"];
+  return s.reachable == null ? ["off", "checking…", "off", ""] : !s.reachable ? ["off", "offline", "off", "The robot does not answer: switched off or out of reach."]
+       : s.service === "active" ? ["ok", "running", "ok", "The robot software runs."]
+       : s.service === "failed" ? ["fail", "crashed", "fail", explain("crashed")] : ["warn", "stopped", "warn", explain("robot software is not running")];
 }
-/** The worst of the software state and the warnings: colours the card's edge. */
+/** The worst of the software state and the warnings: colours the card's top edge. */
 function cardSeverity(s) {
   const levels = [softwareState(s)[0], ...issues(s).map(i => i[0])];
   return levels.includes("fail") ? "fail" : levels.includes("warn") ? "warn" : "";
@@ -566,54 +622,77 @@ function renderHead(box, s, st) {
   if (!st.passive && s.reachable)
     power = s.service === "active"
       ? h("button", {class: "hardstop power", title: "Hard stop: ends the robot software, the robot goes limp at once (hold it). Does not ask.", onclick: () => act({action: "stop", robot: name})}, icon("stop"), "Stop")
-      : h("button", {class: "power", title: "Starts the robot software. The robot starts limp; then hold STAND on the robot for 2 s.", onclick: () => act({action: "start", robot: name})}, icon("play"), " Start");
-  box.append(h("div", {class: "row1"}, h("span", {class: "name"}, name), h("span", {class: "state " + sw[0]}, icon(sw[2]), sw[1]),
-    h("span", {class: "chip", title: "robot type"}, (s.model || "").toUpperCase() || "?"), power));
-  const c = s.claim && !s.claim.expired ? s.claim : null;
-  box.append(h("div", {class: "row2"},
-    h("span", {class: "owner chip " + (c ? (c.mine ? "info" : "warn") : ""), title: c ? "claimed " + ago(c.age_s) + " ago, ends in " + ago(c.left_s) : "Nobody has claimed this robot (bh robot claim)"},
-      icon("person"), c ? claimText(c) : "free"),
-    h("span", {class: "muted small"}, s.ip + (s.hardware ? " - " + s.hardware : "") + (s.backups ? " - " + s.backups + " backup(s) on the robot" : ""))));
+      : h("button", {class: "power", title: "Starts the robot software. The robot starts limp; then hold STAND on the robot for 2 s.", onclick: () => act({action: "start", robot: name})}, icon("play"), "Start");
+  box.append(h("div", {class: "row1"}, h("span", {class: "name"}, name), h("span", {class: "state " + sw[0], title: sw[3]}, icon(sw[2]), sw[1]),
+    h("span", {class: "chip", title: "robot type"}, (s.model || "").toUpperCase() || "?"), power),
+    h("div", {class: "sub"}, s.ip + (s.hardware ? " · " + s.hardware : "") + (s.backups ? " · " + s.backups + " backup" + (s.backups === 1 ? "" : "s") + " on the robot" : "")));
 }
+/** Who uses the robot. The claim is a note kept on the robot, so every teammate's dashboard shows the same. */
+function renderOwner(box, s, st) {
+  box.textContent = "";
+  box.hidden = !s.reachable;
+  if (!s.reachable) return;
+  const c = s.claim && !s.claim.expired ? s.claim : null, name = s.name, can = !st.passive;
+  if (!c) {
+    box.className = "ownbar";
+    box.put(icon("unlock"), h("span", {class: "who"}, h("b", {}, "Free"), h("span", {}, "claim it before you deploy, so others know")),
+      can ? h("button", {title: "Puts your name on the robot for everybody's dashboard and bh commands. Ends by itself.", onclick: () => claimDialog(name)}, "Claim") : null);
+  } else if (c.mine) {
+    box.className = "ownbar mine";
+    box.put(icon("person"), h("span", {class: "who", title: "claimed " + ago(c.age_s) + " ago"}, h("b", {}, "Yours" + (c.note ? " · " + c.note : "")), h("span", {}, "others are asked to check with you · ends in " + ago(c.left_s))),
+      can ? h("button", {title: "Ends your claim: others may use the robot again.", onclick: () => act({action: "release", robot: name})}, "Release") : null);
+  } else {
+    box.className = "ownbar other";
+    box.put(icon("lock"), h("span", {class: "who", title: "claimed " + ago(c.age_s) + " ago, ends in " + ago(c.left_s)}, h("b", {}, c.who + " is using it" + (c.note ? " · " + c.note : "")), h("span", {}, "ask " + c.who + " before you deploy or restart it")),
+      can ? h("button", {title: "Puts your name on it instead - only after asking " + c.who, onclick: () => claimDialog(name)}, "Take over") : null);
+  }
+}
+/** A big button: icon, a verb and a few words that say what happens. */
+function tool(ic, label, sub, title, onclick, cls) { return h("button", {class: "tool " + (cls || ""), title, onclick}, icon(ic), h("b", {}, label), h("small", {}, sub)); }
+/** A line of a "More" menu: icon, name and what it does. */
+function item(ic, label, sub, title, onclick) { return h("button", {role: "menuitem", title, onclick: () => { closeMenus(); onclick(); }}, icon(ic), h("b", {}, label), h("small", {}, sub)); }
+function closeMenus(except) { for (const m of document.querySelectorAll(".menu")) if (m !== except) { m.hidden = true; m.previousSibling && m.previousSibling.setAttribute("aria-expanded", "false"); } }
+document.addEventListener("click", e => { if (!e.target.closest(".menuwrap")) closeMenus(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeMenus(); });
 function renderActions(box, s, st) {
   box.textContent = "";
   box.hidden = !s.reachable;
   if (!s.reachable) return;
-  if (st.passive) { box.append(h("div", {class: "muted small"}, "Passive dashboard: it does not contact the robots, so there are no buttons.")); return; }
-  const name = s.name, c = s.claim && !s.claim.expired ? s.claim : null;
+  if (st.passive) { box.className = ""; box.append(h("div", {class: "muted small"}, "Passive dashboard: it does not contact the robots, so there are no buttons.")); return; }
+  box.className = "toolbar";
+  const name = s.name;
   const player = st.testgc ? parseInt((s.settings || {}).playerNumber, 10) || 0 : 0, penalized = !!(s.gc && s.gc.penalty !== "none");
-  const group = (label, ...buttons) => { const b = buttons.flat().filter(Boolean); return b.length ? h("div", {class: "group", role: "group", "aria-label": label}, h("span", {class: "glabel"}, label), h("div", {class: "gbtns"}, b)) : null; };
+  const menu = h("div", {class: "menu", role: "menu", hidden: true},
+    h("div", {class: "sep"}, "Use"),
+    st.practice && s.service === "active" ? item("stand", "Hold STAND", "a limp robot stands up (practice)", "What holding the STAND button on the robot's chest for 2 s does.", () => act({action: "practice_stand", robot: name})) : null,
+    item("gamepad", "Drive with gamepad", "which buttons do what", "Shows how to drive the robot with its gamepad; the LED stays live.", () => gamepadDialog(name)),
+    st.testgc && player ? item("flag", penalized ? "Unpenalize" : "Penalize", "test GameController: " + (penalized ? "back into play" : "take out of play"), "Test GameController: penalize / unpenalize player " + player, () => act({action: "gc_penalize", player, on: !penalized})) : null,
+    h("div", {class: "sep"}, "Keep what is on it"),
+    item("save", "Back up", "save the robot's software, on the robot", "bh robot backup: copies software, configuration and service files into a backup on the robot. It keeps running.", () => backupDialog(name)),
+    item("restore", "Restore", "put a backup back", "bh robot restore: replaces what is on the robot with a backup. The software stops.", () => restoreDialog(name)),
+    h("div", {class: "sep"}, "Find problems (read only)"),
+    item("search", "Check robot", "will the software run? what is wrong?", "bh robot scan: read-only check of what is installed", () => act({action: "scan", robot: name})),
+    item("file", "Log", "last 400 lines it wrote", "bh logs: the last 400 lines the robot software wrote", () => act({action: "logs", robot: name})),
+    s.dump ? item("bug", "Crash report", "why the last run ended", "bh logs --crash: the report of the last crash", () => act({action: "logs", robot: name, crash: true})) : null);
+  const more = h("button", {class: "tool", "aria-haspopup": "menu", "aria-expanded": "false", title: "Drive, back up, restore, check, log",
+    onclick: e => { e.stopPropagation(); const open = menu.hidden; closeMenus(menu); menu.hidden = !open; more.setAttribute("aria-expanded", String(open)); if (open) { const f = menu.querySelector("button"); if (f) f.focus(); } }},
+    icon("more"), h("b", {}, "More"), h("small", {}, "drive, back up, logs"));
   box.put(
-    group("Software",
-      h("button", {class: "primary", onclick: () => deployDialog(name)}, "Deploy…"),
-      h("button", {onclick: () => pushDialog(name)}, "Send policies…"),
-      h("button", {title: "The robot goes limp for a moment and starts limp again. Asks first.", onclick: () => restartDialog(name)}, "Restart…")),
-    group("Run",
-      st.practice && s.service === "active" ? h("button", {title: "Practice: what holding the STAND button on the robot's chest for 2 s does - a limp robot stands up.",
-                                                            onclick: () => act({action: "practice_stand", robot: name})}, "Hold STAND") : null,
-      h("button", {onclick: () => gamepadDialog(name)}, "Drive with gamepad"),
-      st.testgc && player ? h("button", {class: penalized ? "on" : "", title: "Test GameController: penalize / unpenalize this player",
-                                         onclick: () => act({action: "gc_penalize", player, on: !penalized})}, penalized ? "Unpenalize" : "Penalize") : null),
-    group("Sharing",
-      c && c.mine ? h("button", {title: "Ends your claim: others may use the robot again.", onclick: () => act({action: "release", robot: name})}, "Release")
-                  : h("button", {onclick: () => claimDialog(name)}, c ? "Take over…" : "Claim…"),
-      h("button", {onclick: () => backupDialog(name)}, "Back up…"),
-      h("button", {onclick: () => restoreDialog(name)}, "Restore…")),
-    group("Diagnose",
-      h("button", {title: "Read-only check: what is installed, will the software run?", onclick: () => act({action: "scan", robot: name})}, "Scan"),
-      h("button", {title: "The last 400 lines the robot software wrote (read only)", onclick: () => act({action: "logs", robot: name})}, "Log"),
-      s.dump ? h("button", {title: "The report of the last crash (read only)", onclick: () => act({action: "logs", robot: name, crash: true})}, "Crash dump") : null));
+    tool("deploy", "Deploy", "build + copy all", "bh deploy: builds your code and copies the software and the whole configuration to the robot. Opens the options first.", () => deployDialog(name), "primary"),
+    tool("policy", "Policies", "send .onnx only", "bh policy push: copies only the policy files (walk, kick, get-up) and restarts. No build. Opens first.", () => pushDialog(name)),
+    tool("restart", "Restart", "limp briefly", "bh restart: the robot goes limp for a moment and starts limp again. Asks first.", () => restartDialog(name)),
+    h("div", {class: "menuwrap"}, more, menu));
 }
 function renderGuard(box, s) {
   box.textContent = ""; box.hidden = !(s.guard || s.heartbeat);
   if (box.hidden) return;
   const hb = s.heartbeat, released = !!(hb && hb.released);
   box.className = "guardbox" + (released ? " released" : "");
-  box.put(h("div", {class: "ghead"}, h("b", {style: "display:inline-flex;gap:6px;align-items:center"}, icon("shield"), "Laptop guard"), guardState(released),
-      guardSeg(released, () => act({action: "guard", robot: s.name, released: true}), () => act({action: "guard", robot: s.name, released: false})),
-      hb ? h("button", {title: "Stops sending. The robot stays stopped until a guard sends RUN again.", onclick: () => act({action: "guard_heartbeat", robot: s.name, on: false})}, "End heartbeat") : null),
-    h("span", {class: "muted small"}, (s.guard ? "" : "Heartbeat running, but the robot was not deployed with the guard. ")
-      + "Soft stop: STOP here, the robot stands still. Closing this page = STOP. Hard stop (limp): Stop, STOP ALL or the robot's red button."));
+  box.title = (s.guard ? "" : "Heartbeat running, but the robot was not deployed with the guard. ")
+    + "Laptop guard: RUN lets the robot move while this page runs; STOP makes it stand still (it does not go limp). Closing this page = STOP. For a limp stop use Stop or STOP ALL.";
+  box.put(h("b", {}, icon("shield"), "Guard"), guardState(released),
+    guardSeg(released, () => act({action: "guard", robot: s.name, released: true}), () => act({action: "guard", robot: s.name, released: false})),
+    hb ? h("button", {class: "end", title: "Stops sending. The robot stays stopped until a guard sends RUN again.", onclick: () => act({action: "guard_heartbeat", robot: s.name, on: false})}, "End") : null);
 }
 function renderMore(box, s) {
   box.textContent = "";
@@ -637,28 +716,45 @@ function renderRobots(st) {
     seen.add(s.name);
     let c = cards.get(s.name);
     if (!c) {
-      c = {root: h("div", {class: "card"}), head: h("div", {class: "card-head"}), fig: robotFigure(), cap: h("div", {class: "ledcap"}), gauges: h("div", {class: "gauges"}),
-           issues: h("div", {class: "issues"}), guard: h("div", {class: "guardbox"}), busy: h("div", {class: "busy"}), actions: h("div", {class: "actions"}), more: h("div")};
-      c.root.append(c.head, h("div", {class: "card-body"}, h("div", {class: "figure"}, c.fig, c.cap), c.gauges), c.issues, c.guard, c.busy, c.actions,
+      c = {root: h("div", {class: "card"}), head: h("div", {class: "card-head"}), owner: h("div", {class: "ownbar"}), fig: robotFigure(), cap: h("div", {class: "ledcap"}), gauges: h("div", {class: "stats"}),
+           issues: h("div", {class: "issues"}), guard: h("div", {class: "guardbox"}), busy: h("div", {class: "busy"}), actions: h("div", {class: "toolbar"}), more: h("div")};
+      c.root.append(c.head, c.owner, h("div", {class: "card-body"}, h("div", {class: "figure"}, c.fig, c.cap), c.gauges), c.issues, c.guard, c.busy, c.actions,
                     h("details", {class: "more"}, h("summary", {}, "Details and last log lines"), c.more));
       cards.set(s.name, c); box.append(c.root);
     }
     const sev = cardSeverity(s);
     c.root.className = "card" + (s.reachable === false ? " offline" : "") + (sev ? " sev-" + sev : "");
-    const view = Object.assign({}, s, {time: 0, robot_time: 0, uptime_s: 0, reply: null, claim: s.claim && Object.assign({}, s.claim, {age_s: 0, left_s: 0}),
+    const view = Object.assign({}, s, {time: 0, robot_time: 0, uptime_s: 0, reply: null, claim: s.claim && Object.assign({}, s.claim, {age_s: 0, left_s: Math.round((s.claim.left_s || 0) / 600)}),
                                        led_view: s.led_view && Object.assign({}, s.led_view, {age_s: s.led_view.age_s > 20})});
-    if (changed("head:" + s.name, [st.passive, view.name, view.reachable, view.service, view.model, view.claim, view.ip, view.hardware, view.backups])) renderHead(c.head, s, st);
+    if (changed("head:" + s.name, [st.passive, view.name, view.reachable, view.service, view.model, view.ip, view.hardware, view.backups])) renderHead(c.head, s, st);
+    if (changed("owner:" + s.name, [st.passive, view.reachable, view.claim])) renderOwner(c.owner, s, st);
     if (changed("led:" + s.name, [view.reachable, view.service, view.led_view])) renderLED(c.fig, c.cap, s);
     if (changed("gauges:" + s.name, [s.reachable, s.error, s.battery, s.battery_level, s.max_temp, s.zones, s.wifi, s.disk_free_gb])) renderGauges(c.gauges, s);
     if (changed("issues:" + s.name, s.assess || [])) renderIssues(c.issues, s);
     if (changed("guard:" + s.name, [s.guard, s.heartbeat])) renderGuard(c.guard, s);
     if (changed("busy:" + s.name, s.busy || "")) { c.busy.textContent = ""; c.busy.hidden = !s.busy; if (s.busy) c.busy.append(h("span", {class: "spin"}), "busy: " + s.busy); }
-    if (changed("actions:" + s.name, [st.passive, st.testgc, !!st.practice, s.reachable, s.service, view.claim, s.dump, (s.settings || {}).playerNumber, s.gc && s.gc.penalty])) renderActions(c.actions, s, st);
+    if (changed("actions:" + s.name, [st.passive, st.testgc, !!st.practice, s.reachable, s.service, s.dump, (s.settings || {}).playerNumber, s.gc && s.gc.penalty])) renderActions(c.actions, s, st);
     if (changed("more:" + s.name, [view, s.reply && s.reply.age > 3])) renderMore(c.more, s);
   }
   for (const [name, c] of cards) if (!seen.has(name)) { c.root.remove(); cards.delete(name); for (const k of [...shown.keys()]) if (k.endsWith(":" + name)) shown.delete(k); }
   $("empty").hidden = st.robots.length > 0;
 }
+/** "How sharing works": three steps above the cards until dismissed; clicking "you are NAME" shows it again. */
+const HOWTO_KEY = "bhdash.howto.dismissed";
+function renderHowto(st) {
+  const box = $("howto"), hide = st.passive || !st.robots.length || localStorage.getItem(HOWTO_KEY) === "1";
+  if (!changed("howto", hide)) return;
+  box.hidden = hide; box.textContent = "";
+  if (hide) return;
+  const step = (ic, title, text) => h("div", {class: "hstep"}, icon(ic), h("b", {}, title), h("span", {}, text));
+  box.put(
+    step("person", "1. Claim a robot before you use it", "Your name then shows on every teammate's dashboard - the note is kept on the robot."),
+    step("lock", "2. Claimed by somebody else? Ask them", "Deploy, Policies and Restore make you confirm that you asked. Stop always works for everybody."),
+    step("save", "3. Hand it back as you found it", "Back up before you deploy; afterwards Restore and Release. A claim ends by itself."),
+    h("button", {onclick: () => { localStorage.setItem(HOWTO_KEY, "1"); renderHowto(ST); }}, "Got it"));
+}
+$("me").onclick = () => { localStorage.removeItem(HOWTO_KEY); showTab("robots"); if (ST) renderHowto(ST); };
+$("me").style.cursor = "pointer";
 /** The line at the right of the tabs: every robot at a glance. */
 function renderFleet(st) {
   let run = 0, stopped = 0, off = 0, warn = 0, fail = 0;
@@ -756,7 +852,7 @@ async function restoreDialog(name) {
   const s = robot(name), res = await act({action: "list_backups", robot: name});
   if (!res) return;
   const list = res.backups || [];
-  if (!list.length) { modal("Restore " + name, h("p", {}, "There is no backup on this robot. Back up makes one (and Deploy can make one on the way)."), []); return; }
+  if (!list.length) { modal("Restore " + name, h("p", {}, "There is no backup on this robot. More → Back up makes one (and Deploy can make one on the way)."), []); return; }
   const radios = list.map((b, i) => h("input", {type: "radio", name: "bk", value: b.id, checked: i === 0}));
   const rows = list.map((b, i) => h("label", {class: "c"}, radios[i], h("span", {}, h("b", {}, b.id), " - " + (b.label || "no label") + ", by " + (b.who || "?") + ", " + ago(b.age_s) + " ago, " + b.mb + " MB")));
   const [gateNodes, gate] = claimGate(s, "restore");
@@ -827,10 +923,26 @@ function renderPolicies() {
     tile.ondrop = ev => { ev.preventDefault(); tile.classList.remove("over"); const f = ev.dataTransfer.getData("text/plain"); if (f) useDialog(f, sl); };
     slots.append(tile);
   }
+  slots.append(h("button", {class: "slot add", title: "What a new kind of policy (for example intercepting the ball) needs", onclick: newSlotDialog},
+    h("span", {}, icon("plus"), h("br"), h("b", {}, "New slot"), h("br"), h("span", {class: "small"}, "e.g. intercept - needs C++ code"))));
   const pa = $("polActions"); pa.textContent = "";
   if (ST && ST.practice) pa.append(h("span", {class: "muted small"}, "Practice: policies you use here change only the practice copy (Build/Practice); the running simulator keeps its own."));
   else pa.append(h("button", {onclick: () => act({action: "sim", model})}, "Try in the simulator (" + model.toUpperCase() + ")"));
-  if (ST && !ST.passive) for (const r of ST.robots.filter(r => r.model === model && r.reachable)) pa.append(h("button", {onclick: () => pushDialog(r.name)}, "Send to " + r.name + "…"));
+  if (ST && !ST.passive) for (const r of ST.robots.filter(r => r.model === model && r.reachable)) pa.append(h("button", {onclick: () => pushDialog(r.name)}, "Send to " + r.name));
+}
+/** A slot is a place in the C++ code that runs a network, so a new one cannot be made from the page. */
+function newSlotDialog() {
+  const c = t => h("code", {}, t);
+  modal("Add a policy slot (for example intercept)", h("div", {},
+    h("p", {}, "A slot is a place in the robot's C++ code that runs a network: it builds the network's input every motion cycle and turns its output into joint targets. "
+      + "Dropping a file cannot create one - the code has to know when to run it and what to feed it."),
+    h("ol", {},
+      h("li", {}, h("b", {}, "C++: "), "in ", c("WalkingEngine.h"), " add the parameters (model file, input size), in ", c("WalkingEngine.cpp"), " load and run the network and build its input - exactly as in training. Something must also ask for it (a new kick type or motion request from the behaviour)."),
+      h("li", {}, h("b", {}, "Configuration: "), "the new parameters in every copy of ", c("walkingEngine.cfg"), " (", c("bh policy list"), " shows them), the .onnx file in ", c("Config/NeuralNets/Walk"), "."),
+      h("li", {}, h("b", {}, "One line "), "in ", c("Util/bh/bhtool/policy.py"), " (", c("SLOTS"), "). From then on ", c("bh policy check/use/push"), ", the deploy check and this page show the slot - nothing else to change."),
+      h("li", {}, h("b", {}, "Check: "), c("bh test test_units.py"), " fails if the slot's parameters are missing in a configuration file or in C++; build, ", c("bh sim"), ", then ", c("bh eval --variant"), " with enough games.")),
+    note("info", "A coding agent can do steps 1-4 from Docs/policies.md (\"Adding a slot\"). Motion code runs in the real-time loop: test in the simulator, then on a held robot under the guard."),
+    h("p", {class: "muted small"}, "Only a different file for an existing slot? Drop it on the left and drag it onto the slot - no code needed.")), []);
 }
 function useDialog(file, sl) {
   const info = (META.uploads || []).find(u => u.name === file);
@@ -868,6 +980,34 @@ let following = null, consoleLines = 0, consoleJob = null;
 function setDrawer(open) { $("drawer").classList.toggle("open", open); $("drawerHead").setAttribute("aria-expanded", String(open)); $("drawerToggle").textContent = open ? "hide ▾" : "show ▴"; }
 function follow(id) { following = id; setDrawer(true); pollJob(); }
 $("drawerHead").onclick = () => setDrawer(!$("drawer").classList.contains("open"));
+// resizing: height of the output area in px, kept per browser; the page leaves room below the cards for the drawer
+const DRAWER_KEY = "bhdash.drawer.height";
+function drawerMax() { return Math.max(120, window.innerHeight - 140); }
+function setDrawerHeight(px) {
+  if (px == null) { $("drawer").style.removeProperty("--drawer-h"); localStorage.removeItem(DRAWER_KEY); return; }
+  px = Math.round(Math.min(drawerMax(), Math.max(80, px)));
+  $("drawer").style.setProperty("--drawer-h", px + "px"); localStorage.setItem(DRAWER_KEY, String(px));
+}
+{
+  const saved = parseInt(localStorage.getItem(DRAWER_KEY), 10);
+  if (saved > 0) setDrawerHeight(saved);
+  const grip = $("drawerGrip"), body = $("drawerBody");
+  grip.onpointerdown = e => {
+    e.preventDefault(); grip.setPointerCapture(e.pointerId); $("drawer").classList.add("resizing");
+    const y0 = e.clientY, h0 = body.offsetHeight;
+    grip.onpointermove = m => setDrawerHeight(h0 + y0 - m.clientY);
+    grip.onpointerup = grip.onpointercancel = () => { grip.onpointermove = grip.onpointerup = grip.onpointercancel = null; $("drawer").classList.remove("resizing"); };
+  };
+  grip.ondblclick = () => setDrawerHeight(null);
+  grip.onkeydown = e => {
+    const step = e.shiftKey ? 100 : 30, d = {ArrowUp: step, ArrowDown: -step}[e.key];
+    if (d) { e.preventDefault(); setDrawerHeight(body.offsetHeight + d); }
+    else if (e.key === "Home") { e.preventDefault(); setDrawerHeight(drawerMax()); }
+    else if (e.key === "End") { e.preventDefault(); setDrawerHeight(80); }
+  };
+  new ResizeObserver(() => { document.body.style.marginBottom = ($("drawer").offsetHeight + 16) + "px"; }).observe($("drawer"));
+  window.addEventListener("resize", () => { if ($("drawer").style.getPropertyValue("--drawer-h")) setDrawerHeight(body.offsetHeight); });
+}
 function renderJobs(st) {
   const jobs = (st.jobs || []).slice().reverse(), running = jobs.filter(j => j.state === "running");
   const sum = $("drawerSummary"); sum.textContent = "";
@@ -919,11 +1059,13 @@ function renderHelp(st) {
   box.append(
     h("div", {class: "panel"}, h("h2", {}, "The back LED"), h("p", {class: "muted small"}, "Each robot card mirrors the LED as the robot software reports it (it ignores flashes shorter than half a second). Docs/leds.md has the details."), table),
     h("div", {class: "panel"}, h("h2", {}, "How do I…"),
-      how("…test a new walk policy?", "Policies tab: drop the .onnx file, drag it onto 'walk', choose 'the simulator only', then 'Try in the simulator'. When it walks well, drag it onto 'walk' again with 'the real robots', and use 'Send to ROBOT…' (or Deploy). Arm the guard or keep the robot held for the first steps."),
-      how("…use a robot that others use too?", "Claim it (card → Sharing → Claim…) with a note. Back up before you deploy (Deploy has the checkbox). When you are done: Restore the backup, start the robot, and Release it."),
-      how("…drive a robot myself?", "Card → Run → Drive with gamepad shows the buttons. The LED blinks slowly while the gamepad is in control."),
-      how("…stop a robot?", "Hard: the red-outlined Stop at the top of its card, STOP ALL at the top of the page, or the robot's red button - the robot goes limp at once, so hold it. Neither asks first. Soft: with the laptop guard armed (Deploy → 'Arm the laptop guard') STOP in the guard box makes it stand still."),
-      how("…find out why a robot does not work?", "Diagnose → Scan (read-only) answers 'will it run?' and names what is wrong. Log shows the last 400 lines the software wrote, Crash dump the report of the last crash."),
+      how("…test a new walk policy?", "Policies tab: drop the .onnx file, drag it onto 'walk', choose 'the simulator only', then 'Try in the simulator'. When it walks well, drag it onto 'walk' again with 'the real robots', and use 'Send to ROBOT' (or Deploy). Arm the guard or keep the robot held for the first steps."),
+      how("…use a robot that others use too?", "Everybody runs their own bh dash. Press Claim in the bar under the robot's name and add a note: the claim is kept on the robot, so every teammate's page shows your name, and their Deploy, Policies and Restore make them confirm that they asked you. Back up before you deploy (Deploy has the checkbox). When you are done: More → Restore, start the robot, and Release it. A claim ends by itself; Stop always works for everybody."),
+      how("…know who uses which robot?", "The bar under each robot's name: Free (grey), Yours (blue) or 'NAME is using it' (amber), with their note. Click 'you are NAME' at the top to see the three sharing steps again."),
+      how("…add a new kind of policy (a new slot)?", "Policies tab → New slot explains it: it needs C++ code, configuration and one line in Util/bh/bhtool/policy.py; then the slot appears here and in every bh policy command."),
+      how("…drive a robot myself?", "Card → More → Drive with gamepad shows the buttons. The LED blinks slowly while the gamepad is in control."),
+      how("…stop a robot?", "Hard: the red-outlined Stop at the top of its card, STOP ALL at the top of the page, or the robot's red button - the robot goes limp at once, so hold it. Neither asks first. Soft: with the laptop guard armed (Deploy → 'Arm the laptop guard') STOP in the Guard row of its card makes it stand still."),
+      how("…find out why a robot does not work?", "More → Check robot (read-only) answers 'will it run?' and names what is wrong. More → Log shows the last 400 lines the software wrote, Crash report the report of the last crash."),
       how("…do the same from the command line?", h("p", {}, "Every button runs the same code as a bh command, shown at the top of its output in Activity. bh --help lists them."))),
     h("div", {class: "panel"}, h("h2", {}, "What the colours on this page mean"),
       h("p", {class: "muted small"}, "The page stays grey while everything is normal. Colour, always with an icon and a word, marks what needs attention. The coloured edge of a robot card shows its worst entry."),
@@ -957,7 +1099,9 @@ async function refresh() {
   const jobsBefore = ST ? (ST.jobs || []).filter(j => j.state === "running").length : 0;
   ST = st;
   renderGame(st); renderBars(st); renderRobots(st); renderFleet(st); renderJobs(st);
-  $("me").textContent = "you: " + st.me;
+  $("me").textContent = "you are " + st.me;
+  $("me").title = "Your name on claims and backups, as your teammates see it (BH_USER, else your login name)";
+  renderHowto(st);
   $("stopAll").hidden = st.passive;
   const pb = $("passiveBanner");
   if (changed("passive", st.passive)) { pb.hidden = !st.passive; pb.textContent = ""; if (st.passive) pb.append(icon("info"), "Passive: this page only listens to the GameController and never contacts the robots. To stop a robot use its red button or bh stop."); }
@@ -966,7 +1110,7 @@ async function refresh() {
     prb.hidden = !pr; prb.textContent = "";
     if (pr) prb.append(icon("info"), "Practice: " + pr.robots.join(", ") + " are stand-ins whose bodies are SimRobot's first team (" + pr.scene + ")"
       + (pr.simulator ? "" : " - waiting for the simulator") + ". Every button works as with real robots, nothing reaches one. "
-      + "Stop or Start leaves a robot limp: press Hold STAND to stand it up. " + pr.teammate + " has claimed one robot, to practise sharing.");
+      + "Stop or Start leaves a robot limp: More → Hold STAND stands it up. " + pr.teammate + " has claimed one robot, to practise sharing.");
   }
   if (!helpDone) { renderHelp(st); helpDone = true; }
   if (jobsBefore && !(st.jobs || []).some(j => j.state === "running") && $("tab-policies").classList.contains("active")) loadMeta();

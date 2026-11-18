@@ -26,7 +26,9 @@ To learn the page first without a real robot: `./bh dash --practice`
 
 It opens `http://127.0.0.1:8089/?t=...` in the browser. The page is served to this computer only and every
 request needs the token in that address. Every button runs the same code as the matching `bh` command; the
-command and its output appear in the **Activity** bar at the bottom of the page.
+command and its output appear in the **Activity** bar at the bottom of the page. Drag the top edge of the
+open Activity bar to make it taller or shorter (arrow keys when the edge has the focus, double-click for the
+default size); the page remembers the size.
 
 ### Robots tab: one card per robot
 
@@ -43,46 +45,55 @@ with an icon and a word (the Help tab has the key):
 | blue, circle with "i" | **information** - nothing to fix (laptop guard armed, the robot is claimed by you) |
 | green, tick | the robot software runs |
 
-The coloured left edge of a card shows its worst entry.
+The coloured top edge of a card shows its worst entry.
+
+Above the cards, three steps explain how sharing works (claim, ask, hand back) until you press **Got it**;
+clicking "you are NAME" at the top of the page shows them again.
 
 Each card, from top to bottom:
 
-- the robot's **name**, its software state (running / not running / crashed / offline), robot type and, at
-  the right, **Stop** (red outline; **Start** while the software is not running). Stop is a hard stop and
-  never asks;
-- who is using the robot (**free**, **yours** or **in use by NAME** with their note - see
-  [sharing-robots.md](sharing-robots.md)), address and hardware;
-- **The back LED**, drawn on a robot figure in the colour the robot software reports, blinking like the
-  real one, with its meaning underneath. The robot software writes its LED state next to its status file
-  (`InternalStateProvider`, at most once a second, and only states that lasted half a second, so the short
-  test-mode flashes do not show). A robot whose software is older than this shows "no LED report" until it
-  is deployed again; a robot whose software is stopped shows a grey LED.
-- gauges: battery, hottest joint, robot computer, wireless signal, free disk - grey bars while normal,
-  amber or red with an icon when not;
-- problems, warnings and information (crash dump, battery low, joint hot, disk nearly full, calibration
-  not pulled, laptop guard armed), worst first. Click one for what it means and what to do;
-- buttons in four rows. A button whose name ends in "…" opens a dialog first; the dialogs of everything
-  that makes the robot go limp ask you to confirm that it sits or is held, and if somebody else claimed the
-  robot you must confirm that you asked them. **Cancel** is on the left and has the focus:
-
-| Row | Button | Same as | Note |
-|---|---|---|---|
-| Software | **Deploy…** | `bh deploy` | build, scenario (with the walk speed it allows), player number, LED mode, guard, back up first, dry run |
-| | **Send policies…** | `bh policy push` | **Compare** lists what differs; **Send and restart** copies and restarts |
-| | **Restart…** | `bh restart` | |
-| Run | **Drive with gamepad** | - | the gamepad buttons, with the robot's LED live (it blinks slowly while the gamepad is in control) |
-| | **Penalize** (with `--gc`) | test GameController | |
-| Sharing | **Claim…** / **Take over…** / **Release** | `bh robot claim`, `bh robot release` | Take over when somebody else has it |
-| | **Back up…** / **Restore…** | `bh robot backup`, `bh robot restore` | Restore lists the backups on the robot |
-| Diagnose | **Scan**, **Log**, **Crash dump** | `bh robot scan`, `bh logs` | read only |
-
-**Stop** / **Start** (`bh stop`, `bh start`) are at the top of the card, apart from the other buttons.
-
-- **Laptop guard box** - shown for a robot deployed with the guard, with its state (**may move** in green
-  or **stands still** in grey). **RUN** starts a heartbeat for this robot only and lets it move; **STOP**
-  makes it stand still (a soft stop: it does not go limp); **End heartbeat** stops sending (the robot
+- the robot's **name**, its software state (running / stopped / crashed / offline - hover it for what to
+  do), robot type and, at the right, **Stop** (red outline; **Start** while the software is not running).
+  Stop is a hard stop and never asks. Below: address, hardware, backups on the robot;
+- **who is using it**, a bar with a button: **Free** (grey, **Claim**), **Yours** (blue, with your note and
+  when the claim ends, **Release**) or **NAME is using it** (amber, with their note, **Take over**). The
+  claim is kept on the robot, so every teammate's dashboard shows the same ([sharing-robots.md](sharing-robots.md));
+- **the back LED**, drawn on a small robot figure in the colour the robot software reports, blinking like
+  the real one, with its meaning underneath (hover for the whole text). The robot software writes its LED
+  state next to its status file (`InternalStateProvider`, at most once a second, and only states that
+  lasted half a second, so the short test-mode flashes do not show). A robot whose software is older than
+  this shows "LED unknown" until it is deployed again; a robot whose software is stopped shows a grey LED;
+- five tiles: battery, hottest joint, robot computer, wireless, free disk - grey while normal, amber or red
+  with an icon when not (hover a tile for its limits);
+- problems and warnings that the state badge and the guard row do not already show (crash report, battery
+  low, joint hot, disk nearly full, calibration not pulled), worst first. Click one for what to do;
+- the **Guard** row, for a robot deployed with the laptop guard: its state (**may move** in green or
+  **stands still** in grey), **RUN** / **STOP** and **End**. RUN starts a heartbeat for this robot only and
+  lets it move; STOP makes it stand still (a soft stop: it does not go limp); End stops sending (the robot
   stays stopped). The heartbeat goes only to robots you pressed RUN for, so the page never overrides the
-  guard of a robot somebody else is testing. Closing the page or a sleeping computer means STOP.
+  guard of a robot somebody else is testing. Closing the page or a sleeping computer means STOP;
+- four buttons, each with a few words underneath that say what it does. Every button that changes the
+  robot opens a dialog first; the dialogs of everything that makes the robot go limp ask you to confirm
+  that it sits or is held, and if somebody else claimed the robot you must confirm that you asked them.
+  **Cancel** is on the left and has the focus:
+
+| Button | Underneath | Same as | Note |
+|---|---|---|---|
+| **Deploy** | build + copy all | `bh deploy` | build, scenario (with the walk speed it allows), player number, LED mode, guard, back up first, dry run |
+| **Policies** | send .onnx only | `bh policy push` | **Compare** lists what differs; **Send and restart** copies and restarts |
+| **Restart** | limp briefly | `bh restart` | |
+| **More** | drive, back up, logs | | opens a menu, each entry with a line on what it does: |
+
+| More → | Same as | Note |
+|---|---|---|
+| **Hold STAND** (practice only) | - | what holding STAND on the robot for 2 s does |
+| **Drive with gamepad** | - | the gamepad buttons, with the robot's LED live (it blinks slowly while the gamepad is in control) |
+| **Penalize** / **Unpenalize** (with `--gc`) | test GameController | |
+| **Back up**, **Restore** | `bh robot backup`, `bh robot restore` | Restore lists the backups on the robot |
+| **Check robot**, **Log**, **Crash report** | `bh robot scan`, `bh logs`, `bh logs --crash` | read only |
+
+Hovering any button shows the matching `bh` command and what it does.
+
 - **Details** - team and player number, scenario, location, load, memory, uptime, when it was deployed, and
   the last lines of its log, including everything it said aloud.
 
@@ -94,7 +105,11 @@ Each card, from top to bottom:
    **the real robots** or **both** - this is `bh policy use`, so a file that does not fit is refused before
    anything changes. The slot shows which file the real robots and the simulator use.
 3. **Try in the simulator** starts `bh sim`.
-4. **Send to NAME…** is `bh policy push` (or deploy).
+4. **Send to NAME** is `bh policy push` (or deploy).
+
+The last tile, **New slot**, explains what a new kind of policy (for example intercept) needs: C++ code,
+configuration and one line in `Util/bh/bhtool/policy.py`; then the slot appears on this tab by itself
+([policies.md](policies.md#adding-a-slot-a-new-kind-of-policy-eg-intercept)).
 
 Using a file changes `Config/` in your checkout, exactly like the command; undo with git.
 
@@ -145,15 +160,15 @@ What happens to a practice robot happens to its simulated body, as it would to a
 
 | You do | The simulated robot |
 |---|---|
-| **Stop**, **STOP ALL**, **Restore…** (software stopped) | goes limp and falls |
-| **Start**, **Restart…**, **Deploy…** (software started again) | stays limp, like a real robot after a restart: the LED blinks blue |
-| **Hold STAND** (practice only; on a real robot: set it on its feet, hold STAND for 2 s) | stands up |
-| **Deploy…** with "Arm the laptop guard", then the guard box **RUN** / **STOP** | stands still until RUN, moves while the page sends RUN, stands still again after STOP, closing the page or 1 s without RUN |
+| **Stop**, **STOP ALL**, **More → Restore** (software stopped) | goes limp and falls |
+| **Start**, **Restart**, **Deploy** (software started again) | stays limp, like a real robot after a restart: the LED blinks blue |
+| **More → Hold STAND** (practice only; on a real robot: set it on its feet, hold STAND for 2 s) | stands up |
+| **Deploy** with "Arm the laptop guard", then the Guard row **RUN** / **STOP** | stands still until RUN, moves while the page sends RUN, stands still again after STOP, closing the page or 1 s without RUN |
 | test GameController buttons (initial ... finished, goals, **Penalize**, **FREEZE**) | the simulator's GameController; FREEZE makes the robots stand still |
 
 The cards show the simulated robot's real LED, its position and whether it has fallen. Sim3 is claimed by
-"Kim (practice teammate)", so you can practise asking before you deploy, **Take over…**, **Back up…** and
-**Restore…**. Policies you use on the Policies tab change only the practice copy; the running simulator
+"Kim (practice teammate)", so you can practise asking before you deploy, **Take over**, **More → Back up** and
+**More → Restore**. Policies you use on the Policies tab change only the practice copy; the running simulator
 keeps its own.
 
 | Option | |

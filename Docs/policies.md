@@ -77,6 +77,34 @@ every copy of the configuration file, then run `bh policy check`. Order, scaling
 observations must match training exactly; the size check cannot verify that. Compare a few observation
 vectors from the simulator with your training environment before trusting a new layout.
 
+## Adding a slot (a new kind of policy, e.g. intercept)
+
+A slot is a place in the C++ code that runs a network, so a new one is code, not configuration. Example: an
+`intercept` policy that the walking engine runs while the robot runs to a moving ball.
+
+1. **C++** (`Src/Modules/MotionControl/WalkingEngine/`): in `WalkingEngine.h` add a parameter block, e.g.
+   `(BallNetworkParameters) interceptNetworkParameters`, or a new struct with the model file name and
+   `numInput`; in `WalkingEngine.cpp` compile the model next to `kickPolicy` (with the same size `ASSERT`s),
+   fill its observation exactly as in training, and decide when it runs (a new `KickInfo` type or a field of
+   the `MotionRequest` that a behaviour skill sets). This is real-time motion code: no allocation in the
+   update path.
+2. **Configuration**: the new block in every copy of `walkingEngine.cfg` (`find Config -name
+   walkingEngine.cfg`) - a missing attribute is only an error message on the robot and leaves the value
+   undefined. The `.onnx` file goes into `Config/NeuralNets/Walk`.
+3. **One line** in `Util/bh/bhtool/policy.py`:
+
+   ```python
+   Slot("intercept", "walkingEngine.cfg", "interceptNetworkParameters.kickModel",
+        "interceptNetworkParameters.numInput", "walkNeuronalNetworkParameters.numOutput",
+        "Walk", "intercepting a moving ball"),
+   ```
+
+   From then on `bh policy list/check/info/use/push`, the size check before every deploy and the **Policies**
+   tab of `bh dash` know the slot. Nothing else in the tool or the page needs to change.
+4. **Check**: `bh test test_units.py` fails when a slot's attributes are missing in a configuration file or
+   no longer appear in the C++ headers. Then build, `bh sim`, and measure with `bh eval --variant` on enough
+   games ([simulation.md](simulation.md)); add a row to the table at the top of this page.
+
 ## What a policy is held to
 
 [motion-requirements.md](motion-requirements.md) lists the speeds, kick strengths and get-up times the

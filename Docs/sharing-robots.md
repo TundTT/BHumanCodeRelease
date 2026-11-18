@@ -6,11 +6,16 @@ say who is using a robot, and leave it the way you found it.
 
 | I want to... | Command | Dashboard |
 |---|---|---|
-| tell others I am using a robot | `bh robot claim Alice --note "walk test"` | card → Sharing → **Claim…** (**Take over…** if somebody else has it) |
-| keep what is on it so I can put it back | `bh robot backup Alice` (or `bh deploy Alice --backup`) | **Back up…**, or tick it in **Deploy…** |
-| put it back | `bh robot restore Alice` | **Restore…** |
+| tell others I am using a robot | `bh robot claim Alice --note "walk test"` | **Claim** in the bar under the robot's name (**Take over** if somebody else has it) |
+| keep what is on it so I can put it back | `bh robot backup Alice` (or `bh deploy Alice --backup`) | **More → Back up**, or tick it in **Deploy** |
+| put it back | `bh robot restore Alice` | **More → Restore** |
 | say that I am done | `bh robot release Alice` | **Release** |
-| see who uses which robot | `bh status` (column "in use by") | the badge with the person icon under each robot's name |
+| see who uses which robot | `bh status` (column "in use by") | the bar under each robot's name: **Free**, **Yours** or **NAME is using it** |
+
+Everybody runs their own `bh dash` (or `bh` commands) on their own laptop. Nothing is shared between the
+laptops: the claim is a small file on the robot itself (`~/.bh-claim`), so every dashboard and every `bh`
+command that reads the robot shows the same name. The dashboard shows the three steps (claim, ask, hand back)
+above the robot cards until you press **Got it**; clicking "you are NAME" at the top shows them again.
 
 ## A turn on a robot somebody else set up
 
