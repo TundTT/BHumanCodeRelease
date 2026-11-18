@@ -75,4 +75,6 @@ The colours are computed in `Src/Modules/BehaviorControl/LEDHandler/LEDHandler.c
 
 `InternalStateProvider` reports the LED state (the three `LEDRequest::State` values of red, green, blue) in
 `ledState.txt` next to the status file; `bh status --json` and the dashboard read it. It reports only states
-that lasted 0.5 s, so the test-mode flashes do not appear there.
+that lasted 0.5 s, so the test-mode flashes do not appear there. In SimRobot it writes nothing, unless
+`bh dash --practice` sets `BH_PRACTICE_DIR`: then each simulated robot writes to
+`<BH_PRACTICE_DIR>/<team number>-<player number>/` ([dashboard.md](dashboard.md#practising-on-simulated-robots)).

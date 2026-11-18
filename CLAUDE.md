@@ -179,6 +179,7 @@ motion code, leave it and write down what you found.
 | `gamecontroller.py` | `gc doctor/listen/test`; protocol encode/decode |
 | `sim.py` | `sim`, `connect`, `eval` |
 | `dash.py`, `dash.html` | `dash`: page, background jobs (`core.capture_output` sends their output to the page), uploads, per-robot guard heartbeats |
+| `practice.py` | `dash --practice`: stand-in robots (from `tests/fakerobot.py`) on 127.0.0.x whose bodies are SimRobot's first team, through the bridge in `ConsoleRoboCupCtrl::updatePracticeBridge` (allow-listed console commands, `BH_PRACTICE_PORT`) and the LED files of `InternalStateProvider` (`BH_PRACTICE_DIR`) |
 
 Rules:
 

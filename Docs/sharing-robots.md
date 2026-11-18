@@ -6,11 +6,11 @@ say who is using a robot, and leave it the way you found it.
 
 | I want to... | Command | Dashboard |
 |---|---|---|
-| tell others I am using a robot | `bh robot claim Alice --note "walk test"` | card → **Claim** |
-| keep what is on it so I can put it back | `bh robot backup Alice` (or `bh deploy Alice --backup`) | **Back up**, or tick it in **Deploy…** |
+| tell others I am using a robot | `bh robot claim Alice --note "walk test"` | card → Sharing → **Claim…** (**Take over…** if somebody else has it) |
+| keep what is on it so I can put it back | `bh robot backup Alice` (or `bh deploy Alice --backup`) | **Back up…**, or tick it in **Deploy…** |
 | put it back | `bh robot restore Alice` | **Restore…** |
 | say that I am done | `bh robot release Alice` | **Release** |
-| see who uses which robot | `bh status` (column "in use by") | the badge on each card |
+| see who uses which robot | `bh status` (column "in use by") | the badge with the person icon under each robot's name |
 
 ## A turn on a robot somebody else set up
 

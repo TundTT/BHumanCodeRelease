@@ -21,39 +21,66 @@ And without a computer: the LED on the robot's back ([leds.md](leds.md)) and wha
 ./bh dash --gc --guard
 ```
 
+To learn the page first without a real robot: `./bh dash --practice`
+([below](#practising-on-simulated-robots)).
+
 It opens `http://127.0.0.1:8089/?t=...` in the browser. The page is served to this computer only and every
 request needs the token in that address. Every button runs the same code as the matching `bh` command; the
 command and its output appear in the **Activity** bar at the bottom of the page.
 
 ### Robots tab: one card per robot
 
-(All registered robots, or the ones named on the command line.)
+(All registered robots, or the ones named on the command line.) Right of the tabs, one line sums up all
+robots: how many run, are not running or are offline, and how many problems and warnings they have.
 
+The page stays grey while everything is normal; colour marks only what needs attention, and always comes
+with an icon and a word (the Help tab has the key):
+
+| Looks like | Means |
+|---|---|
+| red, octagon with a cross | **problem** - act now (crashed, battery below the warning level, joint very hot) |
+| amber, triangle | **warning** - check soon (software not running, battery only for short tests, warm joint, disk nearly full, crash dump) |
+| blue, circle with "i" | **information** - nothing to fix (laptop guard armed, the robot is claimed by you) |
+| green, tick | the robot software runs |
+
+The coloured left edge of a card shows its worst entry.
+
+Each card, from top to bottom:
+
+- the robot's **name**, its software state (running / not running / crashed / offline), robot type and, at
+  the right, **Stop** (red outline; **Start** while the software is not running). Stop is a hard stop and
+  never asks;
+- who is using the robot (**free**, **yours** or **in use by NAME** with their note - see
+  [sharing-robots.md](sharing-robots.md)), address and hardware;
 - **The back LED**, drawn on a robot figure in the colour the robot software reports, blinking like the
   real one, with its meaning underneath. The robot software writes its LED state next to its status file
   (`InternalStateProvider`, at most once a second, and only states that lasted half a second, so the short
   test-mode flashes do not show). A robot whose software is older than this shows "no LED report" until it
   is deployed again; a robot whose software is stopped shows a grey LED.
-- software state (running / not running / crashed / offline), robot type, and who is using the robot
-  (**free**, **yours** or **in use by NAME** with their note - see [sharing-robots.md](sharing-robots.md));
-- gauges: battery, hottest joint, robot computer, wireless signal, free disk;
-- warnings (crash dump, battery low, joint hot, disk nearly full, calibration not pulled, laptop guard
-  armed). Click one for what it means and what to do;
-- buttons:
+- gauges: battery, hottest joint, robot computer, wireless signal, free disk - grey bars while normal,
+  amber or red with an icon when not;
+- problems, warnings and information (crash dump, battery low, joint hot, disk nearly full, calibration
+  not pulled, laptop guard armed), worst first. Click one for what it means and what to do;
+- buttons in four rows. A button whose name ends in "…" opens a dialog first; the dialogs of everything
+  that makes the robot go limp ask you to confirm that it sits or is held, and if somebody else claimed the
+  robot you must confirm that you asked them. **Cancel** is on the left and has the focus:
 
-| Button | Same as | Note |
-|---|---|---|
-| **Deploy…** | `bh deploy` | build, scenario (with the walk speed it allows), player number, LED mode, guard, back up first, dry run. Asks you to confirm that the robot sits or is held; if somebody else claimed the robot you must confirm that you asked them |
-| **Send policies…** | `bh policy push` | **Compare** lists what differs; **Send and restart** copies and restarts |
-| **Drive with gamepad** | - | the gamepad buttons, with the robot's LED live (it blinks slowly while the gamepad is in control) |
-| **Stop** / **Start** / **Restart** | `bh stop`, `bh start`, `bh restart` | Stop never asks |
-| **Claim** / **Release** | `bh robot claim`, `bh robot release` | |
-| **Back up** / **Restore…** | `bh robot backup`, `bh robot restore` | Restore lists the backups on the robot |
-| **Scan**, **Log**, **Crash dump** | `bh robot scan`, `bh logs` | read only |
-| **Penalize** (with `--gc`) | test GameController | |
+| Row | Button | Same as | Note |
+|---|---|---|---|
+| Software | **Deploy…** | `bh deploy` | build, scenario (with the walk speed it allows), player number, LED mode, guard, back up first, dry run |
+| | **Send policies…** | `bh policy push` | **Compare** lists what differs; **Send and restart** copies and restarts |
+| | **Restart…** | `bh restart` | |
+| Run | **Drive with gamepad** | - | the gamepad buttons, with the robot's LED live (it blinks slowly while the gamepad is in control) |
+| | **Penalize** (with `--gc`) | test GameController | |
+| Sharing | **Claim…** / **Take over…** / **Release** | `bh robot claim`, `bh robot release` | Take over when somebody else has it |
+| | **Back up…** / **Restore…** | `bh robot backup`, `bh robot restore` | Restore lists the backups on the robot |
+| Diagnose | **Scan**, **Log**, **Crash dump** | `bh robot scan`, `bh logs` | read only |
 
-- **Laptop guard box** - shown for a robot deployed with the guard. **RUN** starts a heartbeat for this
-  robot only and lets it move; **STOP** makes it stand still; **End heartbeat** stops sending (the robot
+**Stop** / **Start** (`bh stop`, `bh start`) are at the top of the card, apart from the other buttons.
+
+- **Laptop guard box** - shown for a robot deployed with the guard, with its state (**may move** in green
+  or **stands still** in grey). **RUN** starts a heartbeat for this robot only and lets it move; **STOP**
+  makes it stand still (a soft stop: it does not go limp); **End heartbeat** stops sending (the robot
   stays stopped). The heartbeat goes only to robots you pressed RUN for, so the page never overrides the
   guard of a robot somebody else is testing. Closing the page or a sleeping computer means STOP.
 - **Details** - team and player number, scenario, location, load, memory, uptime, when it was deployed, and
@@ -73,14 +100,19 @@ Using a file changes `Config/` in your checkout, exactly like the command; undo 
 
 ### Help tab
 
-The LED colours with blinking examples, and short answers to "how do I...".
+The LED colours with blinking examples, what the colours of the page mean, and short answers to "how do I...".
 
 **The game** (top of the page, from GameController packets): state, half, remaining time, score, set play,
 which GameController is sending, whether it was lost, and whether the own team is in that game. With a
 GameController running each robot card also shows its penalty and the remaining penalty time.
 
-**STOP ALL** ends the robot software on every robot (they go limp), sets every guard heartbeat to STOP and
-sets the test GameController's stop flag.
+**STOP ALL** (top right, red on a yellow ring, always visible - also while a dialog is open) ends the robot
+software on every robot (they go limp), sets every guard heartbeat to STOP and sets the test
+GameController's stop flag. It does not ask. With `--passive` it is not shown: that page never contacts the
+robots, a banner says so.
+
+If the page loses contact with `bh dash`, a red banner says so: the page is then out of date and its
+buttons do nothing.
 
 Only one job runs per robot at a time, and jobs that read or change the configuration (deploy, sending
 policies, using a policy) run one after the other.
@@ -95,7 +127,48 @@ policies, using a policy) run one after the other.
 | `--passive` | never contacts the robots: shows only what the GameController broadcasts; all robot buttons are refused. This is the only form to use **during an official game**. |
 | `--interval S` | seconds between robot polls (default 4) |
 | `--players N` | team size for `--gc` (default 5) |
-| `--port N`, `--no-browser` | where to serve; do not open the browser |
+| `--port N`, `--no-browser` | where to serve (default 8089, with `--practice` 8090); do not open the browser |
+| `--practice` | practice on simulated robots - next section |
+
+### Practising on simulated robots
+
+```bash
+./bh dash --practice
+```
+
+starts SimRobot and the dashboard with the practice robots **Sim1, Sim2, Sim3**. Their bodies are the
+simulated robots 1-3 of SimRobot's first team; everything else about them (software, configuration, claims,
+backups, logs) is a stand-in in `Build/Practice`, under the loopback addresses 127.0.0.11, .12, .13. So
+every button runs its real code, and **nothing can reach a real robot**. Your checkout is not changed.
+
+What happens to a practice robot happens to its simulated body, as it would to a real one:
+
+| You do | The simulated robot |
+|---|---|
+| **Stop**, **STOP ALL**, **Restore…** (software stopped) | goes limp and falls |
+| **Start**, **Restart…**, **Deploy…** (software started again) | stays limp, like a real robot after a restart: the LED blinks blue |
+| **Hold STAND** (practice only; on a real robot: set it on its feet, hold STAND for 2 s) | stands up |
+| **Deploy…** with "Arm the laptop guard", then the guard box **RUN** / **STOP** | stands still until RUN, moves while the page sends RUN, stands still again after STOP, closing the page or 1 s without RUN |
+| test GameController buttons (initial ... finished, goals, **Penalize**, **FREEZE**) | the simulator's GameController; FREEZE makes the robots stand still |
+
+The cards show the simulated robot's real LED, its position and whether it has fallen. Sim3 is claimed by
+"Kim (practice teammate)", so you can practise asking before you deploy, **Take over…**, **Back up…** and
+**Restore…**. Policies you use on the Policies tab change only the practice copy; the running simulator
+keeps its own.
+
+| Option | |
+|---|---|
+| `--model k1` / `t1` | robot type (default k1) |
+| `--scene NAME` | SimRobot game scene (default `GameFast3v3` for the K1, `GameFast` for the T1) |
+| `--count N` | number of practice robots (default 3) |
+| `--sim-config C` | which SimRobot build to use (default Develop; build it with `bh build sim`) |
+| `--headless` | SimRobot without a window, e.g. on a computer you reach by ssh |
+
+On a computer you reach over ssh, run it with `--headless --no-browser` and forward the page:
+`ssh -L 8090:127.0.0.1:8090 COMPUTER`, then open the printed address on your own computer.
+
+Ctrl+C ends the dashboard and SimRobot. Closing SimRobot's window ends the practice robots' bodies; the page
+then says so.
 
 What the dashboard does not show: individual joint angles and temperatures, camera images, the behaviour's
 decisions. Those need a debug connection - the next section.

@@ -17,6 +17,7 @@
 #include "Representations/Infrastructure/InternalState.h"
 #include "Representations/Infrastructure/LEDRequest.h"
 #include "Representations/Infrastructure/SensorData/SystemSensorData.h"
+#include <string>
 
 MODULE(InternalStateProvider,
 {,
@@ -37,6 +38,8 @@ MODULE(InternalStateProvider,
 class InternalStateProvider : public InternalStateProviderBase, public Thread
 {
   DECLARE_SYNC;
+  const std::string practiceDir; /**< Where a simulated robot writes its files for "bh dash --practice" (empty: nowhere). */
+  bool writerStarted = false; /**< Whether the writer thread runs (on a robot, or in a practice simulation). */
   unsigned timeWhenLastWritten = 0; /**< The last time when the internal state was written. */
   LEDRequest candidateLEDs; /**< The LED state that was requested last. */
   unsigned timeWhenLEDsChanged = 0; /**< When the requested LED state changed last. */

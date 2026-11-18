@@ -9,10 +9,16 @@
  */
 
 #include "InternalStateProvider.h"
+#include "Framework/Settings.h"
+#include "Streaming/Global.h"
 #include "Streaming/OutStreams.h"
 #include <string>
 #ifdef TARGET_ROBOT
 #include <unistd.h>
+#else
+#include <cstdlib>
+#include <filesystem>
+#include <system_error>
 #endif
 
 MAKE_MODULE(InternalStateProvider);
@@ -37,23 +43,56 @@ namespace
 #endif
     return std::string();
   }
+
+  /**
+   * In the simulator, "bh dash --practice" (Util/bh/bhtool/practice.py) sets BH_PRACTICE_DIR: each simulated
+   * robot then writes its files to <BH_PRACTICE_DIR>/<team number>-<player number>, e.g. .../5-1. Must be
+   * called from the robot's own thread (the settings are per robot).
+   * @return The directory, or an empty string if there is none (always on a real robot).
+   */
+  std::string practiceDirectory()
+  {
+#ifndef TARGET_ROBOT
+    const char* base = std::getenv("BH_PRACTICE_DIR");
+    if(!base || !*base)
+      return std::string();
+    const Settings& settings = Global::getSettings();
+    if(settings.teamNumber < 0 || settings.playerNumber < 0)
+      return std::string();
+    const std::string directory = std::string(base) + "/" + std::to_string(settings.teamNumber) + "-"
+                                  + std::to_string(settings.playerNumber);
+    std::error_code error;
+    std::filesystem::create_directories(directory, error);
+    if(!error)
+      return directory;
+#endif
+    return std::string();
+  }
 }
 
-InternalStateProvider::InternalStateProvider()
+InternalStateProvider::InternalStateProvider() :
+  practiceDir(practiceDirectory())
 {
 #ifdef TARGET_ROBOT
-  setPriority(writerPriority);
-  start(this, &InternalStateProvider::writer);
+  writerStarted = true;
+#else
+  writerStarted = !practiceDir.empty();
 #endif
+  if(writerStarted)
+  {
+    setPriority(writerPriority);
+    start(this, &InternalStateProvider::writer);
+  }
 }
 
 InternalStateProvider::~InternalStateProvider()
 {
-#ifdef TARGET_ROBOT
-  announceStop();
-  writeNow.post();
-  stop();
-#endif
+  if(writerStarted)
+  {
+    announceStop();
+    writeNow.post();
+    stop();
+  }
 }
 
 void InternalStateProvider::update(InternalState& theInternalState)
@@ -100,7 +139,7 @@ void InternalStateProvider::writer()
       internalState = theInternalState;
       leds = ledsToWrite;
     }
-    const std::string directory = stateDirectory();
+    const std::string directory = practiceDir.empty() ? stateDirectory() : practiceDir;
     if(directory.empty())
       continue;
     {

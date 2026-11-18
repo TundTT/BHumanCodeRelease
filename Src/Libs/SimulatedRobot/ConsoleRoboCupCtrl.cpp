@@ -12,7 +12,9 @@
 #include "SimulatedRobot/ControllerRobot.h"
 #include "SimulatedRobot/LocalConsole.h"
 #include "SimulatedRobot/RemoteConsole.h"
+#include "SimulatedRobot/SimulatedRobot.h"
 #include "SimulatedRobot/Views/ConsoleView.h"
+#include "Math/Pose2f.h"
 #include "SimulatedRobot/TestCommandParser.h"
 #include "Platform/File.h"
 #include "Platform/Time.h"
@@ -32,6 +34,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
+#include <cstring>
 #include <functional>
 #include <iostream>
 #include <regex>
@@ -92,6 +96,8 @@ bool ConsoleRoboCupCtrl::compile()
     robot->getRobotConsole()->handleConsole("endOfStartScript");
   for(RemoteConsole* remoteRobot : remoteRobots)
     remoteRobot->handleConsole("endOfStartScript");
+
+  openPracticeBridge();
   return true;
 }
 
@@ -155,6 +161,106 @@ void ConsoleRoboCupCtrl::update()
   if(!msg.empty())
   {
     printLn(msg);
+  }
+
+  updatePracticeBridge();
+}
+
+void ConsoleRoboCupCtrl::openPracticeBridge()
+{
+  practiceBridge.reset();
+  const char* portText = std::getenv("BH_PRACTICE_PORT");
+  if(!portText)
+    return;
+  const int port = std::atoi(portText);
+  if(port <= 0 || port >= 65535)
+  {
+    printLn(std::string("BH_PRACTICE_PORT is not a port: ") + portText);
+    return;
+  }
+  practiceBridge = std::make_unique<UdpComm>();
+  if(practiceBridge->setBlocking(false) && practiceBridge->bind("127.0.0.1", port)
+     && practiceBridge->setTarget("127.0.0.1", port + 1))
+    printLn("Practice: bh dash controls the robots of the first team (UDP " + std::to_string(port) + ").");
+  else
+  {
+    practiceBridge.reset();
+    printLn("Practice: cannot use UDP port " + std::to_string(port) + " for bh dash.");
+  }
+}
+
+void ConsoleRoboCupCtrl::updatePracticeBridge()
+{
+  if(!practiceBridge)
+    return;
+
+  // Only what a person could do at the robots or with a GameController (see Util/bh/bhtool/practice.py).
+  static const char* const allowed[] = {"robot robot", "dr module:GameStateProvider:",
+                                        "for Cognition mr EmergencyButtonState EmergencyButtonProvider",
+                                        "set representation:EmergencyButtonState ", "gc ", "pr ", "mv "};
+  char buffer[4096];
+  int size;
+  while((size = practiceBridge->read(buffer, sizeof(buffer) - 1)) > 0)
+  {
+    buffer[size] = 0;
+    const std::list<RobotConsole*> selectedBefore = selected;
+    std::string text(buffer);
+    size_t start = 0;
+    while(start < text.size())
+    {
+      size_t end = text.find('\n', start);
+      if(end == std::string::npos)
+        end = text.size();
+      const std::string line = text.substr(start, end - start);
+      start = end + 1;
+      if(line.empty())
+        continue;
+      if(std::any_of(std::begin(allowed), std::end(allowed),
+                     [&line](const char* prefix) { return line.rfind(prefix, 0) == 0; }))
+        executeConsoleCommand(line);
+      else
+        printLn("Practice: ignored command '" + line + "'");
+    }
+    selected = selectedBefore;
+  }
+
+  if(Time::getRealTimeSince(timeWhenPracticeStateSent) >= 500)
+  {
+    GameControllerData data;
+    gameController.getGameControllerData(data);
+    RoboCup::RoboCupGameControlData packet = data;
+    std::memcpy(packet.header, GAMECONTROLLER_STRUCT_HEADER, sizeof(packet.header));
+    packet.version = GAMECONTROLLER_STRUCT_VERSION;
+    practiceBridge->write(reinterpret_cast<const char*>(&packet), sizeof(packet));
+
+    // Where the robots of the first team are, as their return packets would say (but from the simulation).
+    for(ControllerRobot* robot : robots)
+    {
+      const RobotConsole* console = robot->getRobotConsole();
+      const std::string& name = robot->getName();
+      const int number = name.rfind("robot", 0) == 0 ? std::atoi(name.c_str() + 5) : 0;
+      if(!console || !console->simulatedRobot || number < 1 || number > SimulatedRobot::robotsPerTeam)
+        continue;
+      Pose2f pose;
+      console->simulatedRobot->getRobotPose(pose);
+      RoboCup::RoboCupGameControlReturnData reply;
+      reply.playerNum = static_cast<uint8_t>(number);
+      reply.teamNum = data.teams[0].teamNumber;
+      reply.fallen = console->simulatedRobot->isUpright() ? 0 : 1;
+      reply.pose[0] = pose.translation.x();
+      reply.pose[1] = pose.translation.y();
+      reply.pose[2] = pose.rotation;
+      Vector2f ball;
+      if(SimulatedRobot::getAbsoluteBallPosition(ball))
+      {
+        const Vector2f relative = pose.inverse() * ball;
+        reply.ballAge = 0.f;
+        reply.ball[0] = relative.x();
+        reply.ball[1] = relative.y();
+      }
+      practiceBridge->write(reinterpret_cast<const char*>(&reply), sizeof(reply));
+    }
+    timeWhenPracticeStateSent = Time::getRealSystemTime();
   }
 }
 

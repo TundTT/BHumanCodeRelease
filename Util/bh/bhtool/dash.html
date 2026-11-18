@@ -5,90 +5,151 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Robot dashboard</title>
 <style>
+  /* Calm neutral surfaces; colour only for what needs attention (ok / info / warn / fail), always with an
+     icon and a word as well. Filled red is reserved for the hard stops. No external resources. */
   :root {
-    --bg: #f3f4f7; --card: #ffffff; --ink: #15171c; --muted: #636b7a; --line: #e0e3e9; --chip: #eef0f4;
-    --ok: #15803d; --warn: #b45309; --fail: #c62828; --accent: #2457d6; --accent-ink: #fff;
-    --okbg: #e7f6ec; --warnbg: #fff4e0; --failbg: #fdecec; --robot: #c9ced8; --robot-line: #9aa1ae;
+    color-scheme: light dark;
+    --bg: #eceef1; --card: #ffffff; --ink: #1b1f24; --muted: #596170; --line: #d5d9df; --chip: #f1f3f5; --track: #e1e4e9;
+    --neutral: #6b7280; --accent: #2155c9; --accent-ink: #fff; --focus: #2155c9;
+    --ok: #17803a; --okbg: #e6f4ea; --warn: #8f520a; --warnfill: #d98a0b; --warnbg: #fff3dc;
+    --fail: #c42b22; --failbg: #fdeceb; --info: #2155c9; --infobg: #e8eefb;
+    --danger-fill: #c42b22; --go-fill: #17803a; --held: #4a5466; --estop-ring: #f2c200;
+    --robot: #c9ced8; --robot-line: #9aa1ae; --shadow: 0 1px 2px rgba(16,24,40,.06);
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #101216; --card: #1a1d23; --ink: #eceef2; --muted: #9aa3b2; --line: #2a2f37; --chip: #252a32;
-            --ok: #4cc27a; --warn: #f0a44b; --fail: #ff6b6b; --accent: #7aa2ff; --accent-ink: #0d1020;
-            --okbg: #15301f; --warnbg: #36280f; --failbg: #3a1717; --robot: #3a404b; --robot-line: #59606d; }
+    :root { --bg: #111317; --card: #1b1e24; --ink: #e9ebef; --muted: #a3abb8; --line: #2f343d; --chip: #252a31; --track: #2f353e;
+            --neutral: #9aa3b2; --accent: #86a8ff; --accent-ink: #0d1020; --focus: #a4bfff;
+            --ok: #5ccb8b; --okbg: #15301f; --warn: #f3b45a; --warnfill: #e79a2a; --warnbg: #34280f;
+            --fail: #ff7b72; --failbg: #3b1816; --info: #8fb0ff; --infobg: #1c2640;
+            --held: #5b6576; --robot: #3a404b; --robot-line: #5d6471; --shadow: none; }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin: 0 0 56px; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
   button, select, input, textarea { font: inherit; color: inherit; }
-  button { border: 1px solid var(--line); background: var(--chip); border-radius: 7px; padding: 5px 11px; cursor: pointer; }
+  button { border: 1px solid var(--line); background: var(--chip); border-radius: 7px; padding: 5px 11px; cursor: pointer; min-height: 30px; }
   button:hover:not(:disabled) { border-color: var(--accent); }
   button:disabled { opacity: .45; cursor: not-allowed; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
   button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-  button.danger { background: var(--fail); color: #fff; border-color: var(--fail); font-weight: 600; }
+  button.danger { background: var(--danger-fill); color: #fff; border-color: var(--danger-fill); font-weight: 700; }
   button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-  button.go { background: var(--ok); color: #fff; border-color: var(--ok); font-weight: 700; }
+  button.go { background: var(--go-fill); color: #fff; border-color: var(--go-fill); font-weight: 700; }
+  button.held { background: var(--held); color: #fff; border-color: var(--held); font-weight: 700; }
+  button.hardstop { background: var(--card); color: var(--fail); border: 2px solid var(--fail); font-weight: 700; display: inline-flex; gap: 6px; align-items: center; }
+  button.hardstop:hover:not(:disabled) { background: var(--danger-fill); color: #fff; border-color: var(--danger-fill); }
+  button.caution { border-color: var(--warnfill); color: var(--warn); font-weight: 600; }
+  button svg, .ico { width: 15px; height: 15px; flex: none; vertical-align: -2px; }
   select, input[type=text], input[type=number] { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; }
   a { color: var(--accent); }
   code { background: var(--chip); border-radius: 4px; padding: 0 4px; font: 12.5px ui-monospace, Consolas, monospace; }
   .muted { color: var(--muted); }
   .small { font-size: 12.5px; }
 
-  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line);
-           padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+  /* top: always visible, with the emergency stop */
+  .top { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }
+  header { padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
   h1 { font-size: 16px; margin: 0; white-space: nowrap; }
-  .game { flex: 1 1 300px; min-width: 0; }
-  .game b { text-transform: uppercase; letter-spacing: .04em; }
-  #stopAll { padding: 8px 18px; font-size: 15px; }
-  nav { display: flex; gap: 4px; padding: 0 16px; background: var(--card); border-bottom: 1px solid var(--line); position: sticky; top: 49px; z-index: 4; }
+  .game { flex: 1 1 320px; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+  .gstate { font-size: 17px; font-weight: 800; letter-spacing: .05em; padding: 1px 10px; border-radius: 6px; border: 1.5px solid var(--line); }
+  .gstate.warn { color: var(--warn); border-color: var(--warnfill); background: var(--warnbg); }
+  .score { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .gline { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .me { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+  .estop { margin-left: auto; display: inline-flex; gap: 9px; align-items: center; padding: 6px 16px 6px 10px; border-radius: 10px;
+           background: var(--danger-fill); color: #fff; border: 2px solid var(--danger-fill); box-shadow: 0 0 0 3px var(--estop-ring); text-align: left; }
+  .estop:hover:not(:disabled) { border-color: #fff; }
+  .estop svg { width: 26px; height: 26px; }
+  .estop b { display: block; font-size: 16px; letter-spacing: .04em; line-height: 1.1; }
+  .estop small { display: block; font-size: 11.5px; opacity: .92; }
+  .banner { padding: 7px 16px; display: flex; gap: 8px; align-items: center; font-weight: 600; }
+  .banner svg { width: 18px; height: 18px; flex: none; }
+  .banner.fail { background: var(--failbg); color: var(--fail); } .banner.info { background: var(--infobg); color: var(--info); }
+  nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 0 16px; border-top: 1px solid var(--line); }
   nav button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 9px 14px; font-weight: 600; color: var(--muted); }
   nav button.active { color: var(--ink); border-bottom-color: var(--accent); }
+  nav button:hover:not(:disabled):not(.active) { border-color: transparent; border-bottom-color: var(--line); color: var(--ink); }
+  .fleet { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0; }
   .tab { display: none; } .tab.active { display: block; }
   .bar { margin: 12px 16px 0; padding: 8px 12px; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-         display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
-  .bar .label { font-weight: 700; margin-right: 6px; }
+         display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; box-shadow: var(--shadow); }
+  .bar .label { font-weight: 700; margin-right: 4px; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+  .bar .label svg, .ghead b svg { width: 18px; height: 18px; flex: none; }
+  .bar.released { border-color: var(--ok); }
   .empty { padding: 32px 16px; color: var(--muted); text-align: center; }
 
+  /* chips and status badges: icon + word, colour only as a third cue */
+  .chip { display: inline-flex; align-items: center; gap: 5px; background: var(--chip); border-radius: 999px; padding: 1px 9px; font-size: 12px; white-space: nowrap; border: 1px solid transparent; }
+  .chip.ok { color: var(--ok); background: var(--okbg); } .chip.warn { color: var(--warn); background: var(--warnbg); }
+  .chip.fail { color: var(--fail); background: var(--failbg); } .chip.info { color: var(--info); background: var(--infobg); }
+  .chip svg { width: 13px; height: 13px; }
+  .state { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; padding: 2px 10px; border-radius: 999px;
+           border: 1.5px solid currentColor; white-space: nowrap; }
+  .state svg { width: 16px; height: 16px; }
+  .state.ok { color: var(--ok); background: var(--okbg); } .state.warn { color: var(--warn); background: var(--warnbg); }
+  .state.fail { color: var(--fail); background: var(--failbg); } .state.off { color: var(--muted); background: var(--chip); }
+  .state.held { color: var(--ink); background: var(--chip); border-color: var(--held); }
+
   /* robot cards */
-  #robots { padding: 14px 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
-  .card.offline { opacity: .7; }
-  .card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-  .card-head .name { font-size: 18px; font-weight: 700; margin-right: 2px; }
-  .chip { display: inline-flex; align-items: center; gap: 5px; background: var(--chip); border-radius: 999px; padding: 1px 9px; font-size: 12px; white-space: nowrap; }
-  .chip.ok { color: var(--ok); background: var(--okbg); } .chip.warn { color: var(--warn); background: var(--warnbg); } .chip.fail { color: var(--fail); background: var(--failbg); }
-  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .owner { margin-left: auto; }
-  .card-body { display: grid; grid-template-columns: 128px 1fr; gap: 12px; margin-top: 10px; }
+  #robots { padding: 14px 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(390px, 1fr)); align-items: start; }
+  @media (max-width: 480px) { #robots { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; box-shadow: var(--shadow); }
+  .card.sev-warn { border-left-color: var(--warnfill); } .card.sev-fail { border-left-color: var(--fail); }
+  .card.offline .card-body, .card.offline .ledcap { opacity: .65; }
+  .card-head { display: grid; gap: 6px; }
+  .row1 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+  .row1 .name { font-size: 22px; font-weight: 800; margin-right: 2px; line-height: 1.1; }
+  .row1 .power { margin-left: auto; }
+  .row2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+  .owner { font-size: 12.5px; font-weight: 600; }
+  .card-body { display: grid; grid-template-columns: 124px 1fr; gap: 14px; margin-top: 10px; }
   .figure { text-align: center; }
-  .figure svg { width: 104px; height: 150px; display: block; margin: 0 auto; }
+  .figure > svg { width: 100px; height: 144px; display: block; margin: 0 auto; }
   .ledcap { font-size: 12.5px; margin-top: 2px; }
-  .ledcap b { display: block; }
+  .ledcap b { display: block; font-size: 14px; }
+  .ledcap .chip { margin-top: 4px; white-space: normal; border-radius: 8px; padding: 3px 7px; align-items: flex-start; text-align: left; }
+  .ledcap .chip svg { margin-top: 2px; }
   .led { transition: fill .2s; }
   .led.slow { animation: blink 1s steps(1) infinite; }
   .led.fast { animation: blink .25s steps(1) infinite; }
   @keyframes blink { 0% { fill: var(--led-on); } 50% { fill: var(--led-off); } }
-  .gauges { display: grid; gap: 7px; align-content: start; }
-  .gauge { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 7px; }
-  .gauge svg { width: 20px; height: 20px; color: var(--muted); }
-  .gauge .val { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 64px; text-align: right; }
-  .meter { height: 8px; border-radius: 4px; background: var(--chip); overflow: hidden; }
-  .meter i { display: block; height: 100%; background: var(--ok); border-radius: 4px; }
-  .meter i.warn { background: var(--warn); } .meter i.fail { background: var(--fail); } .meter i.none { background: transparent; }
-  .wifi { display: flex; gap: 2px; align-items: flex-end; height: 14px; }
-  .wifi i { width: 5px; background: var(--chip); border-radius: 1px; } .wifi i.on { background: var(--ok); }
-  .issues { display: grid; gap: 5px; margin-top: 10px; }
-  details.issue { border-radius: 8px; padding: 4px 9px; background: var(--chip); }
-  details.issue.warn { background: var(--warnbg); } details.issue.fail { background: var(--failbg); }
-  details.issue summary { cursor: pointer; list-style: none; display: flex; gap: 7px; align-items: baseline; }
+  @media (prefers-reduced-motion: reduce) { .led.slow { animation-duration: 2s; } .led.fast { animation-duration: 1s; } }
+  .gauges { display: grid; gap: 9px; align-content: start; }
+  .gauge { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 2px 7px; }
+  .gauge svg { width: 17px; height: 17px; color: var(--muted); }
+  .gauge .lab { font-size: 12.5px; color: var(--muted); }
+  .gauge .val { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; display: inline-flex; gap: 4px; align-items: center; }
+  .gauge .val.warn { color: var(--warn); } .gauge .val.fail { color: var(--fail); }
+  .gauge .bar2 { grid-column: 2 / 4; }
+  .meter { height: 7px; border-radius: 4px; background: var(--track); overflow: hidden; }
+  .meter i { display: block; height: 100%; background: var(--neutral); border-radius: 4px; }
+  .meter i.warn { background: var(--warnfill); } .meter i.fail { background: var(--fail); } .meter i.none { background: transparent; }
+  .wifi { display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+  .wifi i { width: 6px; background: var(--track); border-radius: 1px; } .wifi i.on { background: var(--neutral); } .wifi.warn i.on { background: var(--warnfill); }
+  .issues { display: grid; gap: 5px; margin-top: 12px; }
+  details.issue { border-radius: 8px; padding: 4px 9px; background: var(--chip); border: 1px solid transparent; }
+  details.issue.warn { background: var(--warnbg); border-color: color-mix(in srgb, var(--warnfill) 35%, transparent); }
+  details.issue.fail { background: var(--failbg); border-color: color-mix(in srgb, var(--fail) 35%, transparent); }
+  details.issue.info { background: var(--infobg); }
+  details.issue summary { cursor: pointer; list-style: none; display: flex; gap: 7px; align-items: flex-start; font-weight: 600; }
   details.issue summary::-webkit-details-marker { display: none; }
-  details.issue summary::before { content: "▸"; color: var(--muted); }
-  details.issue[open] summary::before { content: "▾"; }
-  details.issue.warn summary { color: var(--warn); } details.issue.fail summary { color: var(--fail); }
-  details.issue p { margin: 4px 0 2px 14px; }
-  .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
-  .actions .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 2px; }
-  .guardbox { margin-top: 10px; padding: 8px 10px; border-radius: 9px; border: 2px solid var(--warn); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .guardbox.released { border-color: var(--ok); }
-  .busy { margin-top: 8px; font-size: 12.5px; color: var(--accent); }
-  details.more { margin-top: 8px; } details.more summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
+  details.issue summary svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+  details.issue summary .more { margin-left: auto; color: var(--muted); font-weight: 400; font-size: 12px; white-space: nowrap; }
+  details.issue[open] summary .more { visibility: hidden; }
+  details.issue.warn summary { color: var(--warn); } details.issue.fail summary { color: var(--fail); } details.issue.info summary { color: var(--info); }
+  details.issue p { margin: 4px 0 2px 23px; }
+  .guardbox { margin-top: 12px; padding: 9px 11px; border-radius: 10px; border: 2px solid var(--line); display: grid; gap: 7px; }
+  .guardbox.released { border-color: var(--ok); background: var(--okbg); }
+  .guardbox .ghead { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; min-width: 64px; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .busy { margin-top: 10px; font-size: 13px; color: var(--info); font-weight: 600; display: flex; gap: 7px; align-items: center; }
+  .actions { display: grid; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .group { display: grid; grid-template-columns: 78px 1fr; gap: 8px; align-items: center; }
+  .glabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .gbtns { display: flex; flex-wrap: wrap; gap: 6px; }
+  details.more { margin-top: 10px; } details.more > summary { cursor: pointer; color: var(--muted); font-size: 12.5px; }
   .kv { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; font-size: 12.5px; margin-top: 6px; }
   .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow-wrap: anywhere; }
   pre { margin: 6px 0 0; padding: 8px; background: var(--chip); border-radius: 6px; font: 12px/1.4 ui-monospace, Consolas, monospace;
@@ -97,12 +158,12 @@
   /* policies */
   .pol { padding: 14px 16px; display: grid; gap: 14px; grid-template-columns: minmax(280px, 360px) 1fr; }
   @media (max-width: 900px) { .pol { grid-template-columns: 1fr; } }
-  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; box-shadow: var(--shadow); }
   .panel h2 { font-size: 15px; margin: 0 0 8px; }
   .steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 16px 0; }
   .step { display: flex; gap: 7px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px 4px 4px; font-size: 13px; }
   .step b { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: 12px; }
-  .drop { border: 2px dashed var(--line); border-radius: 10px; padding: 18px 10px; text-align: center; cursor: pointer; color: var(--muted); }
+  .drop { display: block; width: 100%; border: 2px dashed var(--line); border-radius: 10px; padding: 18px 10px; text-align: center; cursor: pointer; color: var(--muted); background: none; }
   .drop.over { border-color: var(--accent); color: var(--accent); background: var(--chip); }
   .bench { display: grid; gap: 7px; margin-top: 10px; }
   .pfile { border: 1px solid var(--line); border-radius: 9px; padding: 7px 9px; cursor: grab; background: var(--card); }
@@ -116,59 +177,75 @@
   .slot h3 { margin: 0; font-size: 15px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
   .slot .row { display: grid; grid-template-columns: 74px 1fr; gap: 6px; font-size: 12.5px; margin-top: 4px; }
   .slot .row span:last-child { overflow-wrap: anywhere; font-weight: 600; }
-  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-  .seg button { border: 0; border-radius: 0; }
 
   /* activity drawer */
   #drawer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--card); border-top: 1px solid var(--line); box-shadow: 0 -4px 18px rgba(0,0,0,.08); }
-  #drawerHead { display: flex; gap: 10px; align-items: center; padding: 8px 16px; cursor: pointer; }
+  #drawerHead { display: flex; width: 100%; gap: 10px; align-items: center; padding: 8px 16px; border: 0; border-radius: 0; background: none; text-align: left; min-height: 40px; }
   #drawerHead .title { font-weight: 700; }
   #drawerBody { display: none; grid-template-columns: 240px 1fr; height: 38vh; border-top: 1px solid var(--line); }
   #drawer.open #drawerBody { display: grid; }
   #jobList { overflow: auto; border-right: 1px solid var(--line); }
-  #jobList div { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 13px; }
-  #jobList div.sel { background: var(--chip); }
+  #jobList > div { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid var(--line); font-size: 13px; }
+  #jobList > div.sel { background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); }
   #console { margin: 0; border-radius: 0; max-height: none; height: 100%; }
   #console .fail { color: var(--fail); } #console .warn { color: var(--warn); } #console .ok { color: var(--ok); } #console .head { font-weight: 700; }
-  .spin { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); animation: pulse 1s infinite; }
+  .spin { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--info); animation: pulse 1s infinite; flex: none; }
   @keyframes pulse { 50% { opacity: .25; } }
 
   /* modal, toast, help */
-  #modal { position: fixed; inset: 0; z-index: 10; background: rgba(10,12,16,.45); display: none; align-items: flex-start; justify-content: center; padding: 60px 12px; overflow: auto; }
+  /* The top bar (with STOP ALL) stays above an open dialog, so the emergency stop is always one click away. */
+  #modal { position: fixed; inset: 0; z-index: 10; background: rgba(10,12,16,.5); display: none; align-items: flex-start; justify-content: center;
+           padding: calc(var(--toph, 100px) + 16px) 12px 60px; overflow: auto; }
+  body.modal-open .top { z-index: 12; }
   #modal.open { display: flex; }
-  .dialog { background: var(--card); border-radius: 14px; width: min(560px, 100%); padding: 16px 18px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
-  .dialog h2 { margin: 0 0 10px; font-size: 17px; }
+  .dialog { background: var(--card); border-radius: 14px; width: min(580px, 100%); padding: 16px 18px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+  .dialog h2 { margin: 0 0 10px; font-size: 18px; }
   .dialog label.f { display: grid; grid-template-columns: 150px 1fr; gap: 8px; align-items: center; margin: 8px 0; }
   .dialog label.c { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; }
-  .dialog .note { padding: 8px 10px; border-radius: 8px; margin: 8px 0; font-size: 13px; }
+  .dialog label.c input { margin-top: 3px; width: 16px; height: 16px; flex: none; }
+  .dialog label.c.gate { padding: 8px 10px; border-radius: 8px; border: 2px solid var(--warnfill); background: var(--warnbg); font-weight: 600; }
+  .dialog .note { padding: 8px 10px; border-radius: 8px; margin: 8px 0; font-size: 13px; display: flex; gap: 8px; align-items: flex-start; }
+  .dialog .note > svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }
   .dialog .note.warn { background: var(--warnbg); } .dialog .note.fail { background: var(--failbg); } .dialog .note.info { background: var(--chip); }
-  .dialog .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .dialog .note.warn > svg { color: var(--warn); } .dialog .note.fail > svg { color: var(--fail); } .dialog .note.info > svg { color: var(--info); }
+  .dialog .buttons { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .dialog .buttons button { min-height: 34px; padding: 6px 14px; }
   .dialog ol { padding-left: 20px; } .dialog li { margin: 6px 0; }
   .key { display: inline-block; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; padding: 0 6px; font-weight: 700; font-size: 12.5px; background: var(--chip); }
-  #toast { position: fixed; right: 16px; bottom: 64px; z-index: 11; background: var(--ink); color: var(--bg); padding: 8px 12px; border-radius: 8px; display: none; max-width: 70vw; }
+  #toast { position: fixed; right: 16px; bottom: 64px; z-index: 11; background: var(--ink); color: var(--bg); padding: 9px 14px; border-radius: 8px; display: none; max-width: 70vw; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
   .help { padding: 14px 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
   .legend td { padding: 4px 10px 4px 0; vertical-align: top; }
-  .swatch { width: 16px; height: 16px; border-radius: 50%; display: inline-block; border: 1px solid var(--line); vertical-align: middle; }
   .help details { border-top: 1px solid var(--line); padding: 6px 0; } .help summary { cursor: pointer; font-weight: 600; }
+  .sevtable td { padding: 3px 10px 3px 0; vertical-align: top; }
 </style>
 </head>
 <body>
-<header>
-  <h1>Robot dashboard</h1>
-  <div class="game" id="game"></div>
-  <span class="muted small" id="me"></span>
-  <button class="danger" id="stopAll" title="Ends the robot software on every robot. Robots go limp and fall if nobody holds them.">STOP ALL</button>
-</header>
-<nav>
-  <button data-tab="robots" class="active">Robots</button>
-  <button data-tab="policies">Policies</button>
-  <button data-tab="help">Help &amp; LED colours</button>
-</nav>
+<div class="top">
+  <header>
+    <h1>Robot dashboard</h1>
+    <div class="game" id="game" aria-live="polite"></div>
+    <span class="me" id="me"></span>
+    <button class="estop" id="stopAll" title="Hard stop: ends the robot software on every robot, sets every guard to STOP and the test GameController's stop flag. Robots go limp and fall if nobody holds them. Does not ask.">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z" fill="#fff"/><path d="M8.8 4h6.4L20 8.8v6.4L15.2 20H8.8L4 15.2V8.8z" fill="var(--danger-fill)"/><path d="M8 8l8 8M16 8l-8 8" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <span><b>STOP ALL</b><small>every robot goes limp</small></span>
+    </button>
+  </header>
+  <div class="banner fail" id="connBanner" role="alert" hidden></div>
+  <div class="banner info" id="passiveBanner" hidden></div>
+  <div class="banner info" id="practiceBanner" hidden></div>
+  <nav role="tablist" aria-label="Pages">
+    <button role="tab" data-tab="robots" class="active" aria-selected="true">Robots</button>
+    <button role="tab" data-tab="policies" aria-selected="false">Policies</button>
+    <button role="tab" data-tab="help" aria-selected="false">Help &amp; LED colours</button>
+    <span class="fleet" id="fleet" aria-label="All robots at a glance"></span>
+  </nav>
+</div>
 
 <section class="tab active" id="tab-robots">
   <div class="bar" id="guardBar" hidden></div>
   <div class="bar" id="gcBar" hidden></div>
   <div id="robots"></div>
+  <div class="empty" id="loading">Connecting to <code>bh dash</code>…</div>
   <div class="empty" id="empty" hidden>No robots registered. Add one with <code>bh robot onboard NAME --id N</code>.</div>
 </section>
 
@@ -183,7 +260,7 @@
   <div class="pol">
     <div class="panel">
       <h2>Policy files</h2>
-      <div class="drop" id="drop">Drop <b>.onnx</b> files here<br><span class="small">or click to choose</span></div>
+      <button type="button" class="drop" id="drop">Drop <b>.onnx</b> files here<br><span class="small">or click to choose</span></button>
       <input type="file" id="fileInput" accept=".onnx" multiple hidden>
       <div class="bench" id="bench"></div>
       <details style="margin-top:10px"><summary class="muted small">Files already in the repository</summary><div class="bench" id="repoFiles"></div></details>
@@ -193,8 +270,8 @@
         <h2 style="margin:0">Slots</h2>
         <span class="seg" id="modelSeg"></span>
       </div>
-      <div class="slots" id="slots"></div>
-      <div class="actions" style="margin-top:14px" id="polActions"></div>
+      <div class="slots" id="slots"><div class="muted small">Loading…</div></div>
+      <div class="gbtns" style="margin-top:14px" id="polActions"></div>
       <p class="muted small">Using a file changes <code>Config/</code> in this checkout, exactly like <code>bh policy use</code>.
         Undo with git; commit when it is good. Sizes must match what the C++ code feeds the network
         (<a href="#" data-help="policies">why</a>).</p>
@@ -207,11 +284,11 @@
 </section>
 
 <div id="drawer">
-  <div id="drawerHead"><span class="title">Activity</span><span id="drawerSummary" class="muted small"></span><span style="margin-left:auto" class="muted small" id="drawerToggle">show ▴</span></div>
-  <div id="drawerBody"><div id="jobList"></div><pre id="console"></pre></div>
+  <button id="drawerHead" aria-expanded="false" aria-controls="drawerBody"><span class="title">Activity</span><span id="drawerSummary" class="muted small" style="display:flex;gap:6px;align-items:center"></span><span style="margin-left:auto" class="muted small" id="drawerToggle">show ▴</span></button>
+  <div id="drawerBody"><div id="jobList"></div><pre id="console" aria-live="off"></pre></div>
 </div>
-<div id="modal"><div class="dialog" id="dialog"></div></div>
-<div id="toast"></div>
+<div id="modal"><div class="dialog" id="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle"></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 "use strict";
@@ -234,6 +311,26 @@ function toast(text) { const t = $("toast"); t.textContent = text; t.style.displ
 function ago(s) { if (s == null) return "?"; s = Math.max(0, s | 0); return s < 90 ? s + " s" : s < 5400 ? Math.round(s / 60) + " min" : (s / 3600).toFixed(1) + " h"; }
 function mmss(s) { s = Math.max(0, s | 0); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
 
+// Icons: inline, so the page works offline. Severity icons differ in shape, not only in colour.
+const ICON = {
+  battery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/></svg>',
+  joint: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 14V4a2 2 0 1 0-4 0v10a4 4 0 1 0 4 0z" transform="translate(2 0)"/></svg>',
+  cpu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>',
+  wifi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a15 15 0 0 1 20 0M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0"/><circle cx="12" cy="20" r="1"/></svg>',
+  disk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/></svg>',
+  ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M7.5 12.5l3 3 6-6.5"/></svg>',
+  warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3L2 20.5h20z"/><path d="M12 10v4.5M12 17.5v.1"/></svg>',
+  fail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5h8l5.5 5.5v8L16 21.5H8L2.5 16V8z"/><path d="M9 9l6 6M15 9l-6 6"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.5v.1"/></svg>',
+  off: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5" stroke-dasharray="3 3"/><path d="M8 12h8"/></svg>',
+  stop: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/></svg>',
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg>',
+  person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10v-6z"/></svg>',
+};
+/** An icon with a default size (CSS may override it), so that an unstyled place never shows it huge. */
+const icon = name => { const e = svg(ICON[name]); e.setAttribute("width", "16"); e.setAttribute("height", "16"); return e; };
+
 let ST = null, META = null, model = null;
 async function act(body) {
   try {
@@ -250,20 +347,40 @@ async function loadMeta() { try { META = await (await fetch("/api/meta?t=" + enc
 // ---------------------------------------------------------------- tabs
 for (const b of document.querySelectorAll("nav button")) b.onclick = () => showTab(b.dataset.tab);
 function showTab(name) {
-  for (const b of document.querySelectorAll("nav button")) b.classList.toggle("active", b.dataset.tab === name);
+  for (const b of document.querySelectorAll("nav button")) { b.classList.toggle("active", b.dataset.tab === name); b.setAttribute("aria-selected", String(b.dataset.tab === name)); }
   for (const s of document.querySelectorAll(".tab")) s.classList.toggle("active", s.id === "tab-" + name);
   if (name === "policies") loadMeta();
 }
 
 // ---------------------------------------------------------------- modal
+// Cancel comes first and has the focus (unless there is a field to type in): Enter never confirms by accident.
+let modalReturn = null;
 function modal(title, body, buttons) {
+  if (!$("modal").classList.contains("open")) modalReturn = document.activeElement;
   const d = $("dialog"); d.textContent = "";
-  d.append(h("h2", {}, title), body, h("div", {class: "buttons"}, buttons, h("button", {onclick: closeModal}, "Cancel")));
-  $("modal").classList.add("open");
+  const cancel = h("button", {onclick: closeModal}, "Cancel");
+  d.append(h("h2", {id: "dlgTitle"}, title), body, h("div", {class: "buttons"}, cancel, buttons));
+  document.documentElement.style.setProperty("--toph", document.querySelector(".top").offsetHeight + "px");
+  $("modal").classList.add("open"); document.body.classList.add("modal-open");
+  (d.querySelector("input[type=text]") || cancel).focus();
 }
-function closeModal() { $("modal").classList.remove("open"); }
+function closeModal() {
+  if (!$("modal").classList.contains("open")) return;
+  $("modal").classList.remove("open"); document.body.classList.remove("modal-open");
+  if (modalReturn && modalReturn.isConnected && modalReturn.focus) modalReturn.focus();
+  modalReturn = null;
+}
 $("modal").onclick = e => { if (e.target === $("modal")) closeModal(); };
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeModal();
+  if (e.key === "Tab" && $("modal").classList.contains("open")) {     // keep the focus inside the dialog
+    const f = [...$("dialog").querySelectorAll("button, input, select, textarea, a[href]")].filter(x => !x.disabled && x.offsetParent !== null);
+    if (!f.length) return;
+    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+  }
+});
+function note(level, ...kids) { return h("div", {class: "note " + level}, icon(level === "fail" ? "fail" : level === "warn" ? "warn" : "info"), h("div", {}, kids)); }
 function check(label, opts) { const i = h("input", Object.assign({type: "checkbox"}, opts || {})); return [h("label", {class: "c"}, i, h("span", {}, label)), i]; }
 /** A button that is only enabled while every checkbox in `needs` is ticked. */
 function guarded(text, cls, needs, onclick) {
@@ -278,11 +395,13 @@ function claimGate(s, verb) {
   const c = s.claim;
   if (!c || c.expired || c.mine) return [[], null];
   const [lab, box] = check("I asked " + c.who + " - " + verb + " anyway");
-  return [[h("div", {class: "note fail"}, h("b", {}, "In use by " + c.who), c.note ? " (" + c.note + ")" : "", ", claimed " + ago(c.age_s) + " ago. ",
-                                                  "Whatever is on the robot now is their work."), lab], box];
+  lab.classList.add("gate");
+  return [[note("fail", h("b", {}, "In use by " + c.who), c.note ? " (" + c.note + ")" : "", ", claimed " + ago(c.age_s) + " ago. ",
+                "Whatever is on the robot now is their work."), lab], box];
 }
 function limpGate(name) {
   const [lab, box] = check(name + " is sitting or held (the robot software stops: it goes limp)");
+  lab.classList.add("gate");
   return [lab, box];
 }
 
@@ -290,44 +409,50 @@ function limpGate(name) {
 function renderGame(st) {
   const g = st.game, box = $("game"); box.textContent = "";
   if (!g) { box.append(h("span", {class: "muted"}, "No GameController heard" + (st.testgc ? " yet" : "") + ". Robots follow their buttons.")); return; }
-  if (g.problem && !g.state) { box.append(h("span", {class: "chip fail"}, g.problem)); return; }
-  box.append(h("b", {}, g.state + (g.stopped ? " - STOPPED" : "")), "  " + (g.first_half ? "1st" : "2nd") + " half, " + mmss(g.secs) + " left   team " + g.teams[0] + "  " + g.score[0] + " : " + g.score[1] + "  team " + g.teams[1]
-    + (g.set_play !== "none" ? "   " + g.set_play : "") + (g.secondary > 0 ? "   (" + g.secondary + " s)" : ""));
-  box.append(h("div", {class: "muted small"}, "GameController " + g.source + (st.testgc ? " (TEST controller of this dashboard)" : "") + (g.age > 3 ? " - LOST " + ago(g.age) + " ago" : "") + (g.own_in_game ? "" : " - team " + st.team + " is NOT in this game")));
+  if (g.problem && !g.state) { box.append(h("span", {class: "chip fail"}, icon("fail"), g.problem)); return; }
+  box.append(h("span", {class: "gstate" + (g.stopped ? " warn" : "")}, g.state.toUpperCase() + (g.stopped ? " - STOPPED" : "")),
+    h("span", {class: "score", title: "team " + g.teams[0] + " : team " + g.teams[1]}, "Team " + g.teams[0] + "  " + g.score[0] + " : " + g.score[1] + "  Team " + g.teams[1]),
+    h("span", {}, (g.first_half ? "1st" : "2nd") + " half, " + mmss(g.secs) + " left" + (g.set_play !== "none" ? " - " + g.set_play : "") + (g.secondary > 0 ? " (" + g.secondary + " s)" : "")));
+  box.append(h("div", {class: "gline small"}, h("span", {class: "muted"}, "GameController " + g.source + (st.testgc ? " (TEST controller of this dashboard)" : "")),
+    g.age > 3 ? h("span", {class: "chip warn"}, icon("warn"), "LOST " + ago(g.age) + " ago") : null,
+    g.own_in_game ? null : h("span", {class: "chip warn"}, icon("warn"), "team " + st.team + " is NOT in this game")));
 }
 // Parts of the page are only rebuilt when what they show has changed; otherwise a button could be
 // replaced between pressing and releasing the mouse and the click would be lost.
 const shown = new Map();
 function changed(key, value) { const j = JSON.stringify(value); if (shown.get(key) === j) return false; shown.set(key, j); return true; }
+/** RUN / STOP of a guard heartbeat: the pressed one shows the state (green = may move, grey = stands still). */
+function guardSeg(released, run, stop) {
+  return h("span", {class: "seg", role: "group", "aria-label": "Laptop guard"},
+    h("button", {class: released ? "go" : "", "aria-pressed": String(released), onclick: run}, "RUN"),
+    h("button", {class: released ? "" : "held", "aria-pressed": String(!released), onclick: stop}, "STOP"));
+}
+function guardState(released) {
+  return released ? h("span", {class: "state ok"}, icon("play"), "may move") : h("span", {class: "state held"}, icon("stop"), "stands still");
+}
 function renderBars(st) {
   const gb = $("guardBar"), cb = $("gcBar"), g = st.game || {};
   if (changed("guard", st.guard)) {
     gb.hidden = !st.guard.enabled; gb.textContent = "";
-    if (st.guard.enabled) gb.append(h("span", {class: "label"}, "Laptop guard (all robots)"),
-      h("button", {class: st.guard.released ? "go" : "", onclick: () => act({action: "guard", released: true})}, "RUN - robots may move"),
-      h("button", {class: st.guard.released ? "" : "danger", onclick: () => act({action: "guard", released: false})}, "STOP - robots stand still"),
-      h("span", {class: "muted small"}, "Closing this tab stops the robots."));
+    gb.classList.toggle("released", !!st.guard.released);
+    if (st.guard.enabled) gb.append(h("span", {class: "label"}, icon("shield"), "Laptop guard (all robots)"), guardState(st.guard.released),
+      guardSeg(st.guard.released, () => act({action: "guard", released: true}), () => act({action: "guard", released: false})),
+      h("span", {class: "muted small"}, "RUN - robots may move. STOP - robots stand still. Closing this tab stops the robots."));
   }
   if (changed("gc", [st.testgc, g.state, g.stopped])) {
     cb.hidden = !st.testgc; cb.textContent = "";
     if (st.testgc) {
       cb.append(h("span", {class: "label"}, "Test GameController"));
-      for (const s of ["initial", "ready", "set", "playing", "finished"]) cb.append(h("button", {class: g.state === s ? "on" : "", onclick: () => act({action: "gc_state", state: s})}, s));
+      const seg = h("span", {class: "seg", role: "group", "aria-label": "Game state"});
+      for (const s of ["initial", "ready", "set", "playing", "finished"]) seg.append(h("button", {class: g.state === s ? "on" : "", "aria-pressed": String(g.state === s), onclick: () => act({action: "gc_state", state: s})}, s));
       const stopped = !!g.stopped;
-      cb.append(h("button", {class: stopped ? "on" : "", title: "All robots stand still while the stop flag is set.", onclick: () => act({action: "gc_stopped", stopped: !stopped})}, stopped ? "RELEASE (go)" : "FREEZE (stop flag)"),
-        h("button", {onclick: () => act({action: "gc_goal", own: true})}, "goal for us"), h("button", {onclick: () => act({action: "gc_goal", own: false})}, "goal against"));
+      cb.append(seg, h("button", {class: stopped ? "held" : "caution", title: "All robots stand still while the stop flag is set.", onclick: () => act({action: "gc_stopped", stopped: !stopped})}, stopped ? "RELEASE (go)" : "FREEZE (stop flag)"),
+        h("span", {class: "gbtns"}, h("button", {onclick: () => act({action: "gc_goal", own: true})}, "goal for us"), h("button", {onclick: () => act({action: "gc_goal", own: false})}, "goal against")));
     }
   }
 }
 
 // ---------------------------------------------------------------- robot figure and LED
-const ICON = {
-  battery: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/></svg>',
-  joint: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 14V4a2 2 0 1 0-4 0v10a4 4 0 1 0 4 0z" transform="translate(2 0)"/></svg>',
-  cpu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>',
-  wifi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 9a15 15 0 0 1 20 0M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0"/><circle cx="12" cy="20" r="1"/></svg>',
-  disk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/></svg>',
-};
 function robotFigure() {
   return svg(`<svg viewBox="0 0 100 150" aria-hidden="true">
     <g fill="var(--robot)" stroke="var(--robot-line)" stroke-width="1.5">
@@ -344,7 +469,7 @@ function robotFigure() {
   </svg>`);
 }
 function rgb(a) { return "rgb(" + a.join(",") + ")"; }
-/** [css on, css off, blink, title, text] for a robot's LED. */
+/** [css on, css off, blink, title, text, stale] for a robot's LED. */
 function ledLook(s) {
   const grey = "var(--chip)";
   if (s.reachable === false) return [grey, grey, "", "offline", "The robot does not answer."];
@@ -353,34 +478,42 @@ function ledLook(s) {
   const v = s.led_view;
   if (!v) return [grey, grey, "", "no LED report", "This robot runs software without the LED report. Deploy the current code to see its LED here; until then look at the robot (Help tab explains the colours)."];
   const stale = v.age_s != null && v.age_s > 20;
-  return [rgb(v.rgb), rgb(v.rgb_off), v.blink === "steady" ? "" : v.blink, v.colour + (v.blink === "steady" ? "" : ", " + v.blink + " blinking"),
-          v.meaning + (stale ? " - but no new report for more than 20 s: is the robot software stuck?" : "")];
+  return [rgb(v.rgb), rgb(v.rgb_off), v.blink === "steady" ? "" : v.blink, v.colour + (v.blink === "steady" ? "" : ", " + v.blink + " blinking"), v.meaning, stale];
 }
 function renderLED(fig, cap, s) {
-  const [on, off, blink, title, text] = ledLook(s);
+  const [on, off, blink, title, text, stale] = ledLook(s);
   const led = fig.querySelector(".led"), glow = fig.querySelector(".ledglow");
   led.style.setProperty("--led-on", on); led.style.setProperty("--led-off", off);
   led.setAttribute("fill", on); led.setAttribute("class", "led " + blink);
   glow.setAttribute("fill", on); glow.style.display = on.startsWith("rgb") ? "" : "none";
   cap.textContent = "";
-  cap.append(h("b", {}, title), h("span", {class: "muted"}, text));
+  cap.put(h("b", {}, title), h("span", {class: "muted"}, text),
+    stale ? h("span", {class: "chip warn", title: "No new LED report for more than 20 s"}, icon("warn"), "no new report for 20 s: is the robot software stuck?") : null);
 }
 
 // ---------------------------------------------------------------- gauges
-function meter(pct, level) { return h("div", {class: "meter"}, h("i", {class: level || "", style: "width:" + Math.max(0, Math.min(100, pct)) + "%"})); }
-function gauge(icon, title, bar, value) { return h("div", {class: "gauge", title}, svg(ICON[icon]), bar, h("span", {class: "val"}, value)); }
+function meter(pct, level) { return h("div", {class: "meter bar2"}, h("i", {class: level || "", style: "width:" + Math.max(0, Math.min(100, pct)) + "%"})); }
+/** One gauge: icon, label and value on one line, the bar below. Only abnormal values are coloured (and get an icon). */
+function gauge(ic, label, title, bar, value, level) {
+  const sev = level === "warn" || level === "fail" ? level : "";
+  return h("div", {class: "gauge", title}, svg(ICON[ic]), h("span", {class: "lab"}, label), h("span", {class: "val " + sev}, sev ? icon(sev) : null, value), bar);
+}
 function renderGauges(box, s) {
   box.textContent = "";
-  if (!s.reachable) { box.append(h("div", {class: "muted"}, s.reachable == null ? "Checking..." : s.error || "not reachable")); return; }
+  if (!s.reachable) { box.append(h("div", {class: "muted"}, s.reachable == null ? "Checking…" : s.error || "not reachable")); return; }
   const lvl = s.battery_level === "ok" ? "" : s.battery_level;
-  box.append(gauge("battery", "Battery (reported by the robot software while it runs)", s.battery != null ? meter(s.battery, lvl) : meter(0, "none"), s.battery != null ? s.battery + " %" : "unknown"));
+  box.append(gauge("battery", "Battery", "Battery (reported by the robot software while it runs)", s.battery != null ? meter(s.battery, lvl) : meter(0, "none"), s.battery != null ? s.battery + " %" : "unknown", lvl));
   const t = s.max_temp, tl = t == null ? "none" : t >= 88 ? "fail" : t >= 76 ? "warn" : "";
-  box.append(gauge("joint", "Hottest joint motor (hot from 76 C, very hot from 88 C)", meter(t == null ? 0 : (t - 20) / 0.8, tl), t != null ? t + " C" : "?"));
-  const z = s.zones && s.zones.length ? Math.max(...s.zones) : null;
-  box.append(gauge("cpu", "Robot computer temperature", meter(z == null ? 0 : (z - 20) / 0.8, z == null ? "none" : z >= 85 ? "warn" : ""), z != null ? z.toFixed(0) + " C" : "?"));
-  if (s.wifi) { const q = s.wifi.dbm, bars = q >= -55 ? 4 : q >= -65 ? 3 : q >= -75 ? 2 : q >= -85 ? 1 : 0; const w = h("div", {class: "wifi"}); for (let i = 1; i <= 4; i++) w.append(h("i", {class: i <= bars ? "on" : "", style: "height:" + (i * 25) + "%"})); box.append(gauge("wifi", "Wireless signal of " + s.wifi.device, w, q + " dBm")); }
-  else box.append(gauge("wifi", "No wireless connection reported (cable only?)", h("span", {class: "muted small"}, "cable / none"), ""));
-  if (s.disk_free_gb != null) box.append(gauge("disk", "Disk of the robot", meter(s.disk_used_pct || 0, s.disk_free_gb < 2 ? "warn" : ""), s.disk_free_gb + " GB free"));
+  box.append(gauge("joint", "Hottest joint", "Hottest joint motor (hot from 76 C, very hot from 88 C)", meter(t == null ? 0 : (t - 20) / 0.8, tl), t != null ? t + " C" : "?", tl));
+  const z = s.zones && s.zones.length ? Math.max(...s.zones) : null, zl = z == null ? "none" : z >= 85 ? "warn" : "";
+  box.append(gauge("cpu", "Computer", "Robot computer temperature (hot from 85 C)", meter(z == null ? 0 : (z - 20) / 0.8, zl), z != null ? z.toFixed(0) + " C" : "?", zl));
+  if (s.wifi) {
+    const q = s.wifi.dbm, bars = q >= -55 ? 4 : q >= -65 ? 3 : q >= -75 ? 2 : q >= -85 ? 1 : 0, wl = bars <= 1 ? "warn" : "";
+    const w = h("div", {class: "wifi bar2 " + wl}); for (let i = 1; i <= 4; i++) w.append(h("i", {class: i <= bars ? "on" : "", style: "height:" + (i * 25) + "%"}));
+    box.append(gauge("wifi", "Wireless", "Wireless signal of " + s.wifi.device + " (weak below -75 dBm)", w, q + " dBm", wl));
+  }
+  else box.append(gauge("wifi", "Wireless", "No wireless connection reported (cable only?)", null, h("span", {class: "muted small"}, "cable / none"), ""));
+  if (s.disk_free_gb != null) { const dl = s.disk_free_gb < 2 ? "warn" : ""; box.append(gauge("disk", "Disk", "Disk of the robot (warning below 2 GB free)", meter(s.disk_used_pct || 0, dl), s.disk_free_gb + " GB free", dl)); }
 }
 
 // ---------------------------------------------------------------- issues with explanations
@@ -398,56 +531,89 @@ const EXPLAIN = [
   [/calibration saved on the robot/, "Somebody calibrated this robot on the robot itself. A deploy keeps that calibration (it is rescued first); bh calib pull NAME copies it into the repository so the team has it."],
   [/laptop guard is armed/, "This robot only moves while a laptop sends 'go'. Use the guard box below (RUN / STOP) or bh guard NAME. A normal deploy removes the guard."],
 ];
+// Conditions that are a deliberate set-up rather than something to fix are shown as information,
+// so that warnings keep their meaning (the guard box under the warnings shows the guard itself).
+const INFO_ONLY = [/laptop guard is armed/];
 function explain(text) { for (const [re, t] of EXPLAIN) if (re.test(text)) return t; return "See Docs/testing-and-safety.md."; }
+function issueLevel(level, text) { return level === "warn" && INFO_ONLY.some(re => re.test(text)) ? "info" : level; }
+function issues(s) { return (s.assess || []).filter(([level]) => level !== "ok").map(([level, text]) => [issueLevel(level, text), text]); }
 function renderIssues(box, s) {
   box.textContent = "";
-  for (const [level, text] of (s.assess || [])) if (level !== "ok") box.append(h("details", {class: "issue " + level}, h("summary", {}, text), h("p", {}, explain(text))));
+  const list = issues(s), rank = {fail: 0, warn: 1, info: 2};
+  list.sort((a, b) => (rank[a[0]] ?? 3) - (rank[b[0]] ?? 3));
+  box.hidden = !list.length;
+  for (const [level, text] of list)
+    box.append(h("details", {class: "issue " + level}, h("summary", {}, icon(level === "fail" || level === "warn" ? level : "info"), h("span", {}, text), h("span", {class: "more"}, "what to do ▸")), h("p", {}, explain(text))));
 }
 
 // ---------------------------------------------------------------- per robot actions and dialogs
 function claimText(c) { return c.mine ? "yours" + (c.note ? ": " + c.note : "") : "in use by " + c.who + (c.note ? ": " + c.note : ""); }
-function renderHead(box, s) {
+/** [severity class, word, icon] of the robot software. */
+function softwareState(s) {
+  return s.reachable == null ? ["off", "checking…", "off"] : !s.reachable ? ["off", "offline", "off"] : s.service === "active" ? ["ok", "running", "ok"]
+       : s.service === "failed" ? ["fail", "crashed", "fail"] : ["warn", "not running", "warn"];
+}
+/** The worst of the software state and the warnings: colours the card's edge. */
+function cardSeverity(s) {
+  const levels = [softwareState(s)[0], ...issues(s).map(i => i[0])];
+  return levels.includes("fail") ? "fail" : levels.includes("warn") ? "warn" : "";
+}
+function renderHead(box, s, st) {
   box.textContent = "";
-  const sw = s.reachable == null ? ["", "checking..."] : !s.reachable ? ["fail", "offline"] : s.service === "active" ? ["ok", "running"] : s.service === "failed" ? ["fail", "crashed"] : ["warn", "not running"];
-  box.append(h("span", {class: "name"}, s.name), h("span", {class: "chip " + sw[0]}, h("span", {class: "dot"}), sw[1]), h("span", {class: "chip"}, (s.model || "").toUpperCase() || "?"));
+  const sw = softwareState(s), name = s.name;
+  // The hard stop of this robot sits apart from the routine buttons, at the top of the card. It never asks.
+  let power = null;
+  if (!st.passive && s.reachable)
+    power = s.service === "active"
+      ? h("button", {class: "hardstop power", title: "Hard stop: ends the robot software, the robot goes limp at once (hold it). Does not ask.", onclick: () => act({action: "stop", robot: name})}, icon("stop"), "Stop")
+      : h("button", {class: "power", title: "Starts the robot software. The robot starts limp; then hold STAND on the robot for 2 s.", onclick: () => act({action: "start", robot: name})}, icon("play"), " Start");
+  box.append(h("div", {class: "row1"}, h("span", {class: "name"}, name), h("span", {class: "state " + sw[0]}, icon(sw[2]), sw[1]),
+    h("span", {class: "chip", title: "robot type"}, (s.model || "").toUpperCase() || "?"), power));
   const c = s.claim && !s.claim.expired ? s.claim : null;
-  box.append(h("span", {class: "owner chip " + (c ? (c.mine ? "ok" : "warn") : ""), title: c ? "claimed " + ago(c.age_s) + " ago, ends in " + ago(c.left_s) : "Nobody has claimed this robot (bh robot claim)"},
-    c ? claimText(c) : "free"));
-  box.append(h("div", {class: "muted small", style: "flex-basis:100%"}, s.ip + (s.hardware ? " - " + s.hardware : "") + (s.backups ? " - " + s.backups + " backup(s) on the robot" : "")));
+  box.append(h("div", {class: "row2"},
+    h("span", {class: "owner chip " + (c ? (c.mine ? "info" : "warn") : ""), title: c ? "claimed " + ago(c.age_s) + " ago, ends in " + ago(c.left_s) : "Nobody has claimed this robot (bh robot claim)"},
+      icon("person"), c ? claimText(c) : "free"),
+    h("span", {class: "muted small"}, s.ip + (s.hardware ? " - " + s.hardware : "") + (s.backups ? " - " + s.backups + " backup(s) on the robot" : ""))));
 }
 function renderActions(box, s, st) {
   box.textContent = "";
-  if (st.passive || !s.reachable) return;
+  box.hidden = !s.reachable;
+  if (!s.reachable) return;
+  if (st.passive) { box.append(h("div", {class: "muted small"}, "Passive dashboard: it does not contact the robots, so there are no buttons.")); return; }
   const name = s.name, c = s.claim && !s.claim.expired ? s.claim : null;
   const player = st.testgc ? parseInt((s.settings || {}).playerNumber, 10) || 0 : 0, penalized = !!(s.gc && s.gc.penalty !== "none");
-  box.put(h("button", {class: "primary", onclick: () => deployDialog(name)}, "Deploy…"),
-    h("button", {onclick: () => pushDialog(name)}, "Send policies…"),
-    h("button", {onclick: () => gamepadDialog(name)}, "Drive with gamepad"),
-    h("span", {class: "sep"}),
-    s.service === "active" ? h("button", {title: "Ends the robot software: the robot goes limp at once.", onclick: () => act({action: "stop", robot: name})}, "Stop")
-                           : h("button", {title: "Starts the robot software. The robot starts limp.", onclick: () => act({action: "start", robot: name})}, "Start"),
-    h("button", {onclick: () => restartDialog(name)}, "Restart"),
-    h("span", {class: "sep"}),
-    c && c.mine ? h("button", {onclick: () => act({action: "release", robot: name})}, "Release") : h("button", {onclick: () => claimDialog(name)}, c ? "Claimed…" : "Claim"),
-    h("button", {onclick: () => backupDialog(name)}, "Back up"),
-    h("button", {onclick: () => restoreDialog(name)}, "Restore…"),
-    h("span", {class: "sep"}),
-    st.testgc && player ? h("button", {class: penalized ? "on" : "", title: "Test GameController: penalize / unpenalize this player",
-                                       onclick: () => act({action: "gc_penalize", player, on: !penalized})}, penalized ? "Unpenalize" : "Penalize") : null,
-    h("button", {title: "Read-only check: what is installed, will the software run?", onclick: () => act({action: "scan", robot: name})}, "Scan"),
-    h("button", {onclick: () => act({action: "logs", robot: name})}, "Log"),
-    s.dump ? h("button", {onclick: () => act({action: "logs", robot: name, crash: true})}, "Crash dump") : null);
+  const group = (label, ...buttons) => { const b = buttons.flat().filter(Boolean); return b.length ? h("div", {class: "group", role: "group", "aria-label": label}, h("span", {class: "glabel"}, label), h("div", {class: "gbtns"}, b)) : null; };
+  box.put(
+    group("Software",
+      h("button", {class: "primary", onclick: () => deployDialog(name)}, "Deploy…"),
+      h("button", {onclick: () => pushDialog(name)}, "Send policies…"),
+      h("button", {title: "The robot goes limp for a moment and starts limp again. Asks first.", onclick: () => restartDialog(name)}, "Restart…")),
+    group("Run",
+      st.practice && s.service === "active" ? h("button", {title: "Practice: what holding the STAND button on the robot's chest for 2 s does - a limp robot stands up.",
+                                                            onclick: () => act({action: "practice_stand", robot: name})}, "Hold STAND") : null,
+      h("button", {onclick: () => gamepadDialog(name)}, "Drive with gamepad"),
+      st.testgc && player ? h("button", {class: penalized ? "on" : "", title: "Test GameController: penalize / unpenalize this player",
+                                         onclick: () => act({action: "gc_penalize", player, on: !penalized})}, penalized ? "Unpenalize" : "Penalize") : null),
+    group("Sharing",
+      c && c.mine ? h("button", {title: "Ends your claim: others may use the robot again.", onclick: () => act({action: "release", robot: name})}, "Release")
+                  : h("button", {onclick: () => claimDialog(name)}, c ? "Take over…" : "Claim…"),
+      h("button", {onclick: () => backupDialog(name)}, "Back up…"),
+      h("button", {onclick: () => restoreDialog(name)}, "Restore…")),
+    group("Diagnose",
+      h("button", {title: "Read-only check: what is installed, will the software run?", onclick: () => act({action: "scan", robot: name})}, "Scan"),
+      h("button", {title: "The last 400 lines the robot software wrote (read only)", onclick: () => act({action: "logs", robot: name})}, "Log"),
+      s.dump ? h("button", {title: "The report of the last crash (read only)", onclick: () => act({action: "logs", robot: name, crash: true})}, "Crash dump") : null));
 }
 function renderGuard(box, s) {
   box.textContent = ""; box.hidden = !(s.guard || s.heartbeat);
   if (box.hidden) return;
   const hb = s.heartbeat, released = !!(hb && hb.released);
   box.className = "guardbox" + (released ? " released" : "");
-  box.put(h("b", {}, "Laptop guard"), h("span", {class: "muted small"}, s.guard ? (released ? "robot may move" : "robot stands still until RUN") : "heartbeat running, but the robot was not deployed with the guard"),
-    h("button", {class: released ? "go" : "", onclick: () => act({action: "guard", robot: s.name, released: true})}, "RUN"),
-    h("button", {class: released ? "" : "danger", onclick: () => act({action: "guard", robot: s.name, released: false})}, "STOP"),
-    hb ? h("button", {title: "Stops sending. The robot stays stopped until a guard sends RUN again.", onclick: () => act({action: "guard_heartbeat", robot: s.name, on: false})}, "End heartbeat") : null,
-    h("span", {class: "muted small", style: "flex-basis:100%"}, "Soft stop: the robot stands still. Closing this page = STOP. Hard stop: Stop / STOP ALL or the robot's red button."));
+  box.put(h("div", {class: "ghead"}, h("b", {style: "display:inline-flex;gap:6px;align-items:center"}, icon("shield"), "Laptop guard"), guardState(released),
+      guardSeg(released, () => act({action: "guard", robot: s.name, released: true}), () => act({action: "guard", robot: s.name, released: false})),
+      hb ? h("button", {title: "Stops sending. The robot stays stopped until a guard sends RUN again.", onclick: () => act({action: "guard_heartbeat", robot: s.name, on: false})}, "End heartbeat") : null),
+    h("span", {class: "muted small"}, (s.guard ? "" : "Heartbeat running, but the robot was not deployed with the guard. ")
+      + "Soft stop: STOP here, the robot stands still. Closing this page = STOP. Hard stop (limp): Stop, STOP ALL or the robot's red button."));
 }
 function renderMore(box, s) {
   box.textContent = "";
@@ -457,7 +623,7 @@ function renderMore(box, s) {
   add("team / player", "team " + (cfg.teamNumber || "?") + ", player " + (cfg.playerNumber || "?"));
   add("scenario", (cfg.scenario || "?") + " / " + (cfg.location || "?") + (s.led ? ", LED mode " + s.led : ""));
   if (s.gc) add("referee", s.gc.penalty === "none" ? "in play" : "PENALIZED: " + s.gc.penalty + (s.gc.secs ? " (" + s.gc.secs + " s)" : ""));
-  if (s.reply) add("robot says", (s.reply.fallen ? "FALLEN, " : "upright, ") + "at x " + s.reply.pose[0] + " y " + s.reply.pose[1] + " mm facing " + s.reply.pose[2] + " deg; ball " + (s.reply.ball_age < 0 ? "never seen" : "seen " + s.reply.ball_age + " s ago"));
+  if (s.reply) add(ST && ST.practice ? "simulator (truth)" : "robot says", (s.reply.fallen ? "FALLEN, " : "upright, ") + "at x " + s.reply.pose[0] + " y " + s.reply.pose[1] + " mm facing " + s.reply.pose[2] + " deg; ball " + (s.reply.ball_age < 0 ? "never seen" : "seen " + s.reply.ball_age + " s ago"));
   add("computer", [s.load && s.load.length ? "load " + s.load[0] : "", s.mem_pct != null ? "memory " + s.mem_pct + " %" : ""].filter(Boolean).join(", "));
   add("switched on", ago(s.uptime_s) + " ago" + (s.binary_time && s.robot_time ? ", deployed " + ago(s.robot_time - s.binary_time) + " ago" : ""));
   add("more", "camera, joints, behaviour: bh connect " + s.name);
@@ -477,20 +643,40 @@ function renderRobots(st) {
                     h("details", {class: "more"}, h("summary", {}, "Details and last log lines"), c.more));
       cards.set(s.name, c); box.append(c.root);
     }
-    c.root.className = "card" + (s.reachable === false ? " offline" : "");
+    const sev = cardSeverity(s);
+    c.root.className = "card" + (s.reachable === false ? " offline" : "") + (sev ? " sev-" + sev : "");
     const view = Object.assign({}, s, {time: 0, robot_time: 0, uptime_s: 0, reply: null, claim: s.claim && Object.assign({}, s.claim, {age_s: 0, left_s: 0}),
                                        led_view: s.led_view && Object.assign({}, s.led_view, {age_s: s.led_view.age_s > 20})});
-    if (changed("head:" + s.name, [view.name, view.reachable, view.service, view.model, view.claim, view.ip, view.hardware, view.backups])) renderHead(c.head, s);
+    if (changed("head:" + s.name, [st.passive, view.name, view.reachable, view.service, view.model, view.claim, view.ip, view.hardware, view.backups])) renderHead(c.head, s, st);
     if (changed("led:" + s.name, [view.reachable, view.service, view.led_view])) renderLED(c.fig, c.cap, s);
     if (changed("gauges:" + s.name, [s.reachable, s.error, s.battery, s.battery_level, s.max_temp, s.zones, s.wifi, s.disk_free_gb])) renderGauges(c.gauges, s);
     if (changed("issues:" + s.name, s.assess || [])) renderIssues(c.issues, s);
     if (changed("guard:" + s.name, [s.guard, s.heartbeat])) renderGuard(c.guard, s);
-    c.busy.textContent = s.busy ? "● busy: " + s.busy : "";
-    if (changed("actions:" + s.name, [st.passive, st.testgc, s.reachable, s.service, view.claim, s.dump, (s.settings || {}).playerNumber, s.gc && s.gc.penalty])) renderActions(c.actions, s, st);
+    if (changed("busy:" + s.name, s.busy || "")) { c.busy.textContent = ""; c.busy.hidden = !s.busy; if (s.busy) c.busy.append(h("span", {class: "spin"}), "busy: " + s.busy); }
+    if (changed("actions:" + s.name, [st.passive, st.testgc, !!st.practice, s.reachable, s.service, view.claim, s.dump, (s.settings || {}).playerNumber, s.gc && s.gc.penalty])) renderActions(c.actions, s, st);
     if (changed("more:" + s.name, [view, s.reply && s.reply.age > 3])) renderMore(c.more, s);
   }
   for (const [name, c] of cards) if (!seen.has(name)) { c.root.remove(); cards.delete(name); for (const k of [...shown.keys()]) if (k.endsWith(":" + name)) shown.delete(k); }
   $("empty").hidden = st.robots.length > 0;
+}
+/** The line at the right of the tabs: every robot at a glance. */
+function renderFleet(st) {
+  let run = 0, stopped = 0, off = 0, warn = 0, fail = 0;
+  for (const s of st.robots) {
+    const sw = softwareState(s)[1];
+    if (sw === "running") run++; else if (sw === "offline") off++; else if (sw !== "checking…") stopped++;
+    for (const [level] of issues(s)) { if (level === "fail") fail++; else if (level === "warn") warn++; }
+  }
+  const key = [st.robots.length, run, stopped, off, warn, fail];
+  if (!changed("fleet", key)) return;
+  const box = $("fleet"); box.textContent = "";
+  if (!st.robots.length) return;
+  box.put(h("span", {class: "chip"}, st.robots.length + (st.robots.length === 1 ? " robot" : " robots")),
+    run ? h("span", {class: "chip ok"}, icon("ok"), run + " running") : null,
+    stopped ? h("span", {class: "chip warn"}, icon("warn"), stopped + " not running") : null,
+    off ? h("span", {class: "chip"}, icon("off"), off + " offline") : null,
+    fail ? h("span", {class: "chip fail"}, icon("fail"), fail + (fail === 1 ? " problem" : " problems")) : null,
+    warn ? h("span", {class: "chip warn"}, icon("warn"), warn + (warn === 1 ? " warning" : " warnings")) : null);
 }
 const robot = name => (ST && ST.robots.find(r => r.name === name)) || {name};
 
@@ -512,8 +698,8 @@ async function deployDialog(name) {
   const [dryL, dry] = check("Dry run: check everything, copy nothing");
   const [gateNodes, gate] = claimGate(s, "deploy");
   const [limpL, limp] = limpGate(name);
-  const binNote = h("div", {class: "note warn"});
-  const upd = () => { const b = meta.builds[config.value]; binNote.hidden = build.checked || (b && b.exists); binNote.textContent = "There is no " + config.value + " build yet - tick 'Build first'."; };
+  const binNote = note("warn", "");
+  const upd = () => { const b = meta.builds[config.value]; binNote.hidden = build.checked || (b && b.exists); binNote.lastChild.textContent = "There is no " + config.value + " build yet - tick 'Build first'."; };
   config.onchange = upd; build.onchange = upd; upd();
   const go = guarded("Deploy", "primary", [gate, limp], async () => {
     closeModal();
@@ -527,7 +713,7 @@ async function deployDialog(name) {
     h("label", {class: "f"}, "Player number", player),
     h("label", {class: "f"}, "Back LED mode", led),
     guardL, backupL, dryL, gateNodes,
-    h("div", {class: "note warn"}, "Deploying replaces the robot's software and its whole configuration. Calibration and inference engines saved on the robot are rescued first."),
+    note("warn", "Deploying replaces the robot's software and its whole configuration. Calibration and inference engines saved on the robot are rescued first."),
     limpL), go);
 }
 function pushDialog(name) {
@@ -548,14 +734,15 @@ function restartDialog(name) {
 }
 function claimDialog(name) {
   const s = robot(name), c = s.claim && !s.claim.expired ? s.claim : null;
-  const note = h("input", {type: "text", placeholder: "what you are doing, e.g. walk policy test", style: "width:100%"});
+  const noteIn = h("input", {type: "text", placeholder: "what you are doing, e.g. walk policy test", style: "width:100%"});
   const hours = h("select", {}, ...[1, 2, 4, 8].map(n => h("option", {value: n, selected: n === 4}, n + " h")));
   const [forceL, force] = c && !c.mine ? check("Take it over - I asked " + c.who) : [null, null];
-  modal("Claim " + name, h("div", {},
+  if (forceL) forceL.classList.add("gate");
+  modal((c && !c.mine ? "Take over " : "Claim ") + name, h("div", {},
     h("p", {}, "Tells everybody that you are using this robot: their deploys and policy pushes stop and name you. A stop always works. The claim ends by itself."),
-    c && !c.mine ? h("div", {class: "note fail"}, "Already in use by " + c.who + (c.note ? " (" + c.note + ")" : "") + ", for " + ago(c.age_s) + ".") : null,
-    h("label", {class: "f"}, "Note", note), h("label", {class: "f"}, "For", hours), forceL),
-    guarded("Claim", "primary", [force], () => { closeModal(); act({action: "claim", robot: name, note: note.value, hours: parseFloat(hours.value), force: !!(force && force.checked)}); }));
+    c && !c.mine ? note("fail", "Already in use by " + c.who + (c.note ? " (" + c.note + ")" : "") + ", for " + ago(c.age_s) + ".") : null,
+    h("label", {class: "f"}, "Note", noteIn), h("label", {class: "f"}, "For", hours), forceL),
+    guarded("Claim", "primary", [force], () => { closeModal(); act({action: "claim", robot: name, note: noteIn.value, hours: parseFloat(hours.value), force: !!(force && force.checked)}); }));
 }
 function backupDialog(name) {
   const label = h("input", {type: "text", placeholder: "e.g. Dana's intercept build", style: "width:100%"});
@@ -575,7 +762,7 @@ async function restoreDialog(name) {
   const [gateNodes, gate] = claimGate(s, "restore");
   const [limpL, limp] = limpGate(name);
   modal("Restore " + name, h("div", {}, ...rows,
-    h("div", {class: "note warn"}, "Replaces what is on the robot now with the backup. The robot software stops and is not started again."),
+    note("warn", "Replaces what is on the robot now with the backup. The robot software stops and is not started again."),
     gateNodes, limpL),
     guarded("Restore", "primary", [gate, limp], () => { const b = radios.find(r => r.checked); closeModal(); act({action: "restore", robot: name, backup: b ? b.value : "", ignore_claim: !!(gate && gate.checked)}); }));
 }
@@ -601,7 +788,7 @@ function gamepadDialog(name) {
 // ---------------------------------------------------------------- policies
 function fitChips(f, m) {
   const box = h("div", {class: "fits"});
-  if (f.error) { box.append(h("span", {class: "chip fail"}, f.error)); return box; }
+  if (f.error) { box.append(h("span", {class: "chip fail"}, icon("fail"), f.error)); return box; }
   for (const [slot, problem] of Object.entries((f.fits || {})[m] || {})) {
     if (problem === "not used for this robot type") continue;
     box.append(h("span", {class: "chip " + (problem ? "" : "ok"), title: problem || "fits"}, (problem ? "✗ " : "✓ ") + slot));
@@ -619,7 +806,7 @@ function renderPolicies() {
   const models = Object.keys(META.policies.models);
   if (!model) model = (ST && ST.robots[0] && ST.robots[0].model) || models[0];
   const seg = $("modelSeg"); seg.textContent = "";
-  for (const m of models) seg.append(h("button", {class: m === model ? "on" : "", onclick: () => { model = m; renderPolicies(); }}, m.toUpperCase()));
+  for (const m of models) seg.append(h("button", {class: m === model ? "on" : "", "aria-pressed": String(m === model), onclick: () => { model = m; renderPolicies(); }}, m.toUpperCase()));
   const bench = $("bench"); bench.textContent = "";
   if (!META.uploads.length) bench.append(h("div", {class: "muted small"}, "Nothing dropped yet."));
   for (const u of META.uploads) bench.append(pfile(u.name, u, model));
@@ -633,7 +820,7 @@ function renderPolicies() {
       h("div", {class: "muted small"}, sl.what),
       h("div", {class: "row"}, h("span", {class: "muted"}, "Real robots"), h("span", {}, sl.robot.join(", ") || "-")),
       h("div", {class: "row"}, h("span", {class: "muted"}, "Simulator"), h("span", {}, shared ? "same as the robots" : sl.sim.join(", "))),
-      ...sl.problems.map(p => h("div", {class: "chip fail", style: "white-space:normal;margin-top:6px"}, p)),
+      ...sl.problems.map(p => h("div", {class: "chip fail", style: "white-space:normal;margin-top:6px"}, icon("fail"), p)),
       h("div", {class: "muted small", style: "margin-top:6px"}, "Drop a file here"));
     tile.ondragover = ev => { ev.preventDefault(); tile.classList.add("over"); };
     tile.ondragleave = () => tile.classList.remove("over");
@@ -641,19 +828,20 @@ function renderPolicies() {
     slots.append(tile);
   }
   const pa = $("polActions"); pa.textContent = "";
-  pa.append(h("button", {onclick: () => act({action: "sim", model})}, "Try in the simulator (" + model.toUpperCase() + ")"));
-  if (ST) for (const r of ST.robots.filter(r => r.model === model && r.reachable)) pa.append(h("button", {onclick: () => pushDialog(r.name)}, "Send to " + r.name + "…"));
+  if (ST && ST.practice) pa.append(h("span", {class: "muted small"}, "Practice: policies you use here change only the practice copy (Build/Practice); the running simulator keeps its own."));
+  else pa.append(h("button", {onclick: () => act({action: "sim", model})}, "Try in the simulator (" + model.toUpperCase() + ")"));
+  if (ST && !ST.passive) for (const r of ST.robots.filter(r => r.model === model && r.reachable)) pa.append(h("button", {onclick: () => pushDialog(r.name)}, "Send to " + r.name + "…"));
 }
 function useDialog(file, sl) {
   const info = (META.uploads || []).find(u => u.name === file);
   const problem = info ? (info.fits || {})[model] && info.fits[model][sl.key] : null;
   const scope = h("select", {}, h("option", {value: "sim"}, "the simulator only (try it first)"), h("option", {value: "robot"}, "the real robots"), h("option", {value: "all"}, "both"));
-  const sharedNote = h("div", {class: "note info"}, "This slot has no separate copy for the simulator: 'real robots' also changes what the simulator uses.");
+  const sharedNote = note("info", "This slot has no separate copy for the simulator: 'real robots' also changes what the simulator uses.");
   sharedNote.hidden = !!sl.sim.length;
   const ok = h("button", {class: "primary", disabled: !!problem, onclick: () => { closeModal(); act({action: "policy_use", slot: sl.key, file, model, scope: scope.value}).then(() => setTimeout(loadMeta, 1500)); }}, "Use it");
   modal("Use " + file + " for " + sl.key + " (" + model.toUpperCase() + ")", h("div", {},
-    problem ? h("div", {class: "note fail"}, "Does not fit: " + problem + ". The observation and action layout is built in C++; a different size needs code changes (Docs/policies.md).")
-            : h("div", {class: "note info"}, info ? "Fits this slot (" + info.signature + ")." : "The size is checked before anything is changed."),
+    problem ? note("fail", "Does not fit: " + problem + ". The observation and action layout is built in C++; a different size needs code changes (Docs/policies.md).")
+            : note("info", info ? "Fits this slot (" + info.signature + ")." : "The size is checked before anything is changed."),
     h("label", {class: "f"}, "Use it in", scope), sharedNote,
     h("p", {class: "muted small"}, "Changes the configuration files in this checkout (like bh policy use). The robots get it with Deploy or Send policies.")), ok);
 }
@@ -677,18 +865,19 @@ drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); upload([
 
 // ---------------------------------------------------------------- activity drawer
 let following = null, consoleLines = 0, consoleJob = null;
-function follow(id) { following = id; $("drawer").classList.add("open"); $("drawerToggle").textContent = "hide ▾"; pollJob(); }
-$("drawerHead").onclick = () => { const d = $("drawer"); d.classList.toggle("open"); $("drawerToggle").textContent = d.classList.contains("open") ? "hide ▾" : "show ▴"; };
+function setDrawer(open) { $("drawer").classList.toggle("open", open); $("drawerHead").setAttribute("aria-expanded", String(open)); $("drawerToggle").textContent = open ? "hide ▾" : "show ▴"; }
+function follow(id) { following = id; setDrawer(true); pollJob(); }
+$("drawerHead").onclick = () => setDrawer(!$("drawer").classList.contains("open"));
 function renderJobs(st) {
   const jobs = (st.jobs || []).slice().reverse(), running = jobs.filter(j => j.state === "running");
   const sum = $("drawerSummary"); sum.textContent = "";
   if (running.length) sum.append(h("span", {class: "spin"}), " " + running.map(j => j.title).join(", "));
-  else if (jobs.length) sum.append(jobs[0].title + ": " + (jobs[0].state === "ok" ? "done" : "FAILED"));
+  else if (jobs.length) sum.append(h("span", {class: "chip " + (jobs[0].state === "ok" ? "ok" : "fail")}, icon(jobs[0].state === "ok" ? "ok" : "fail"), jobs[0].state === "ok" ? "done" : "FAILED"), " " + jobs[0].title);
   else sum.append((st.messages || []).slice(-1)[0] || "nothing yet");
   if (!changed("jobs", jobs.map(j => [j.id, j.state, following]))) return;
   const list = $("jobList"); list.textContent = "";
-  for (const j of jobs) list.append(h("div", {class: j.id === following ? "sel" : "", onclick: () => follow(j.id)},
-    j.state === "running" ? h("span", {class: "spin"}) : h("span", {class: j.state === "ok" ? "chip ok" : "chip fail"}, j.state === "ok" ? "done" : "failed"), " ", j.title,
+  for (const j of jobs) list.append(h("div", {class: j.id === following ? "sel" : "", tabindex: "0", role: "button", onclick: () => follow(j.id), onkeydown: e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); follow(j.id); } }},
+    j.state === "running" ? h("span", {class: "spin"}) : h("span", {class: j.state === "ok" ? "chip ok" : "chip fail"}, icon(j.state === "ok" ? "ok" : "fail"), j.state === "ok" ? "done" : "failed"), " ", j.title,
     h("div", {class: "muted small"}, new Date(j.started * 1000).toLocaleTimeString())));
   if (!jobs.length) list.append(h("div", {class: "muted"}, "Deploys, scans and other jobs appear here."));
   if (following === null && running.length) follow(running[0].id);
@@ -726,15 +915,25 @@ function renderHelp(st) {
     table.append(h("tr", {}, h("td", {}, dot), h("td", {}, h("b", {}, name)), h("td", {class: "muted"}, meaning)));
   }
   const how = (title, ...body) => h("details", {}, h("summary", {}, title), ...body.map(b => typeof b === "string" ? h("p", {}, b) : b));
+  const sevRow = (cls, ic, word, text) => h("tr", {}, h("td", {}, h("span", {class: "chip " + cls}, icon(ic), word)), h("td", {class: "muted"}, text));
   box.append(
     h("div", {class: "panel"}, h("h2", {}, "The back LED"), h("p", {class: "muted small"}, "Each robot card mirrors the LED as the robot software reports it (it ignores flashes shorter than half a second). Docs/leds.md has the details."), table),
     h("div", {class: "panel"}, h("h2", {}, "How do I…"),
       how("…test a new walk policy?", "Policies tab: drop the .onnx file, drag it onto 'walk', choose 'the simulator only', then 'Try in the simulator'. When it walks well, drag it onto 'walk' again with 'the real robots', and use 'Send to ROBOT…' (or Deploy). Arm the guard or keep the robot held for the first steps."),
-      how("…use a robot that others use too?", "Claim it (card → Claim) with a note. Back up before you deploy (Deploy has the checkbox). When you are done: Restore the backup, start the robot, and Release it."),
-      how("…drive a robot myself?", "Card → Drive with gamepad shows the buttons. The LED blinks slowly while the gamepad is in control."),
-      how("…stop a robot?", "Hard: Stop on the card, STOP ALL at the top, or the robot's red button - the robot goes limp at once, so hold it. Soft: with the laptop guard armed (Deploy → 'Arm the laptop guard') STOP makes it stand still."),
-      how("…find out why a robot does not work?", "Scan (read-only) answers 'will it run?' and names what is wrong. Log shows the last 400 lines the software wrote, Crash dump the report of the last crash."),
+      how("…use a robot that others use too?", "Claim it (card → Sharing → Claim…) with a note. Back up before you deploy (Deploy has the checkbox). When you are done: Restore the backup, start the robot, and Release it."),
+      how("…drive a robot myself?", "Card → Run → Drive with gamepad shows the buttons. The LED blinks slowly while the gamepad is in control."),
+      how("…stop a robot?", "Hard: the red-outlined Stop at the top of its card, STOP ALL at the top of the page, or the robot's red button - the robot goes limp at once, so hold it. Neither asks first. Soft: with the laptop guard armed (Deploy → 'Arm the laptop guard') STOP in the guard box makes it stand still."),
+      how("…find out why a robot does not work?", "Diagnose → Scan (read-only) answers 'will it run?' and names what is wrong. Log shows the last 400 lines the software wrote, Crash dump the report of the last crash."),
       how("…do the same from the command line?", h("p", {}, "Every button runs the same code as a bh command, shown at the top of its output in Activity. bh --help lists them."))),
+    h("div", {class: "panel"}, h("h2", {}, "What the colours on this page mean"),
+      h("p", {class: "muted small"}, "The page stays grey while everything is normal. Colour, always with an icon and a word, marks what needs attention. The coloured edge of a robot card shows its worst entry."),
+      h("table", {class: "sevtable"},
+        sevRow("fail", "fail", "problem", "act now: crashed, battery below the warning level, joint very hot"),
+        sevRow("warn", "warn", "warning", "check soon: software not running, battery for short tests only, warm joint, disk nearly full"),
+        sevRow("info", "info", "information", "nothing to fix: a deliberate set-up, e.g. the laptop guard is armed; robots claimed by you"),
+        sevRow("ok", "ok", "running", "the robot software runs"),
+        h("tr", {}, h("td", {}, h("span", {class: "chip"}, icon("off"), "offline")), h("td", {class: "muted"}, "the robot does not answer (switched off or out of reach)")),
+        h("tr", {}, h("td", {}, h("span", {class: "state ok"}, icon("play"), "may move"), " ", h("span", {class: "state held"}, icon("stop"), "stands still")), h("td", {class: "muted"}, "laptop guard: RUN / STOP")))),
     h("div", {class: "panel", "data-anchor": "policies"}, h("h2", {}, "Why must a policy fit its slot?"),
       h("p", {}, "The robot builds the network's input vector in C++ (WalkingEngine, GetUpEngine) and reads its output the same way. A file with another input or output size would read garbage: the robot only checks the sizes with assertions, and Release builds have none. So the sizes are checked here, before a deploy, and before sending a policy."),
       h("p", {class: "muted small"}, "A new observation layout needs code changes and new numInput/numOutput values - see Docs/policies.md.")));
@@ -742,21 +941,37 @@ function renderHelp(st) {
 for (const a of document.querySelectorAll("[data-help]")) a.onclick = e => { e.preventDefault(); showTab("help"); };
 
 // ---------------------------------------------------------------- refresh loop
-let helpDone = false;
+let helpDone = false, failures = 0;
 async function refresh() {
   let st;
   try { st = await (await fetch("/api/state?t=" + encodeURIComponent(token))).json(); }
-  catch (e) { $("game").textContent = "The dashboard process is not running (start it with: bh dash)."; return; }
-  if (st.error) { $("game").textContent = st.error; return; }
+  catch (e) {
+    if (++failures >= 2) {
+      const b = $("connBanner"); b.hidden = false; b.textContent = "";
+      b.append(icon("fail"), "No contact with bh dash - the page is out of date and its buttons do nothing. Robots under the laptop guard stand still. Use the robots' own buttons or bh stop; start the page again with: bh dash");
+    }
+    return;
+  }
+  if (st.error) { $("connBanner").hidden = false; $("connBanner").textContent = st.error; return; }
+  failures = 0; $("connBanner").hidden = true; $("loading").hidden = true;
   const jobsBefore = ST ? (ST.jobs || []).filter(j => j.state === "running").length : 0;
   ST = st;
-  renderGame(st); renderBars(st); renderRobots(st); renderJobs(st);
+  renderGame(st); renderBars(st); renderRobots(st); renderFleet(st); renderJobs(st);
   $("me").textContent = "you: " + st.me;
   $("stopAll").hidden = st.passive;
+  const pb = $("passiveBanner");
+  if (changed("passive", st.passive)) { pb.hidden = !st.passive; pb.textContent = ""; if (st.passive) pb.append(icon("info"), "Passive: this page only listens to the GameController and never contacts the robots. To stop a robot use its red button or bh stop."); }
+  const prb = $("practiceBanner"), pr = st.practice;
+  if (changed("practice", pr ? [pr.scene, pr.simulator] : null)) {
+    prb.hidden = !pr; prb.textContent = "";
+    if (pr) prb.append(icon("info"), "Practice: " + pr.robots.join(", ") + " are stand-ins whose bodies are SimRobot's first team (" + pr.scene + ")"
+      + (pr.simulator ? "" : " - waiting for the simulator") + ". Every button works as with real robots, nothing reaches one. "
+      + "Stop or Start leaves a robot limp: press Hold STAND to stand it up. " + pr.teammate + " has claimed one robot, to practise sharing.");
+  }
   if (!helpDone) { renderHelp(st); helpDone = true; }
   if (jobsBefore && !(st.jobs || []).some(j => j.state === "running") && $("tab-policies").classList.contains("active")) loadMeta();
 }
-$("stopAll").onclick = () => act({action: "stop_all"});
+$("stopAll").onclick = () => { closeModal(); act({action: "stop_all"}); };
 refresh(); setInterval(refresh, 1000);
 </script>
 </body>

@@ -773,5 +773,164 @@ class TestGameControllerLoop(unittest.TestCase):
             gc.broadcast_addresses = saved
 
 
+class FakeSimulator:
+    """Plays SimRobot's side of the practice link (ConsoleRoboCupCtrl::updatePracticeBridge): records the
+    console commands and sends the game state and the first team's positions."""
+
+    def __init__(self, port: int):
+        from bhtool import gamecontroller as gc
+        self.gc = gc
+        self.port = port
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind(("127.0.0.1", port))
+        self.sock.settimeout(0.1)
+        self.commands = []
+        self.fallen = set()
+        self.game = gc.GameData(players_per_team=3)
+        self.game.teams[0].number, self.game.teams[1].number = 5, 70
+        self.running = True
+        import threading
+        self.thread = threading.Thread(target=self.run, daemon=True)
+        self.thread.start()
+
+    def run(self):
+        last = 0.0
+        while self.running:
+            try:
+                data, _ = self.sock.recvfrom(4096)
+                self.commands.append(data.decode())
+            except (socket.timeout, ConnectionResetError):   # Windows reports sends to a closed port here
+                pass
+            except OSError:
+                break
+            if time.time() - last > 0.2:
+                last = time.time()
+                self.sock.sendto(self.gc.encode(self.game), ("127.0.0.1", self.port + 1))
+                for n in (1, 2, 3):
+                    reply = self.gc.ReturnData(n, 5, int(n in self.fallen), (-1000.0 * n, 500.0, 0.5), 0.0, (800.0, 0.0))
+                    self.sock.sendto(self.gc.encode_return(reply), ("127.0.0.1", self.port + 1))
+
+    def close(self):
+        self.running = False
+        self.thread.join(2)
+        self.sock.close()
+
+
+class PracticeTest(unittest.TestCase):
+    """bh dash --practice with a stand-in for SimRobot: what the buttons do to the simulated robots."""
+
+    def wait_for(self, what, condition, d=None, timeout=30):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if d is not None:
+                d.state()                          # the page asks once a second (dead man of the guard)
+            if condition():
+                return
+            time.sleep(0.1)
+        self.fail("timed out waiting for %s; commands: %s" % (what, self.sim.commands[-12:]))
+
+    def sent(self, robot, command):
+        return "robot %s\n%s" % (robot, command) in self.sim.commands
+
+    def test_practice_dashboard(self):
+        from bhtool import practice
+        tmp = Path(tempfile.mkdtemp(prefix="bhpractice"))
+        real = (core.ROOT, core.tcp_open, core.ssh_key, dict(os.environ))
+        port = 10994
+        try:
+            self.sim = FakeSimulator(port)
+        except OSError:
+            shutil.rmtree(tmp, ignore_errors=True)
+            self.skipTest("UDP port %d is in use" % port)
+        lab = practice.PracticeLab("k1", "GameFast3v3", 3, "Develop", port=port, base=tmp / "practice",
+                                   start_simulator=False)
+        d = None
+        try:
+            lab.find_simulator()
+            if fakerobot.find_bash(tmp) is None:
+                self.skipTest("no bash found that can run the repository scripts")
+            names = lab.prepare()
+            self.assertEqual(names, ["Sim1", "Sim2", "Sim3"])
+            self.assertNotEqual(core.ROOT, real[0])
+            for r in core.load_robots():          # only loopback addresses: nothing can reach a real robot
+                self.assertEqual((r.lan, r.wlan), (practice.address(int(r.name[3:])),) * 2)
+            lab.start()
+            d = dash.Dashboard(core.resolve_targets(names, prefer="lan"), interval=0.5, passive=False,
+                               test_gc=lab.gc, guard=None, practice=lab)
+            import threading
+            threading.Thread(target=d.poll_loop, daemon=True).start()
+
+            # the simulator appears: every robot gets the guard's module, nobody is stopped
+            self.wait_for("set-up", lambda: all(self.sent("robot%d" % n, practice.emergency_command(False))
+                                                 for n in (1, 2, 3)), d)
+            self.assertTrue(self.sent("robot2", "for Cognition mr EmergencyButtonState EmergencyButtonProvider"))
+            st = d.state()
+            self.assertEqual(st["team"], 5)
+            self.assertEqual(st["practice"]["robots"], names)
+            self.assertEqual(st["game"]["teams"], [5, 70])
+
+            # Stop -> limp; Hold STAND refused while stopped; Start -> still limp; Hold STAND -> stands up
+            d.action({"action": "stop", "robot": "Sim1"})
+            self.wait_for("unstiff", lambda: self.sent("robot1", practice.UNSTIFF), d)
+            self.wait_for("Sim1 stopped", lambda: not lab.robot("Sim1").software_running(), d)
+            with self.assertRaises(core.BhError):
+                d.action({"action": "practice_stand", "robot": "Sim1"})
+            count = self.sim.commands.count("robot robot1\n" + practice.UNSTIFF)
+            d.action({"action": "start", "robot": "Sim1"})
+            self.wait_for("unstiff after start", lambda: self.sim.commands.count("robot robot1\n" + practice.UNSTIFF) > count, d)
+            self.sim.fallen.add(1)                 # it collapsed when it went limp
+            time.sleep(0.5)
+            d.action({"action": "practice_stand", "robot": "Sim1"})
+            self.wait_for("stand up", lambda: self.sent("robot1", practice.STAND_UP), d)
+            self.wait_for("set on its feet", lambda: self.sent("robot1", "mv -1000 500 537 0 0 29"), d)
+            self.sim.fallen.clear()
+
+            # the test GameController buttons drive the simulator's GameController
+            d.action({"action": "gc_state", "state": "playing"})
+            d.action({"action": "gc_penalize", "player": 2, "on": True})
+            d.action({"action": "gc_goal", "own": True})
+            self.wait_for("gc", lambda: "gc playing" in self.sim.commands and self.sent("robot2", "pr manual")
+                          and "gc goal firstTeam" in self.sim.commands, d)
+            with self.assertRaises(core.BhError):
+                d.action({"action": "sim"})
+
+            # the simulated robot's LED and position appear on the card
+            led = tmp / "practice" / "sim" / "5-1"
+            led.mkdir(parents=True)
+            (led / "ledState.txt").write_text("0 1 0")
+            self.wait_for("LED", lambda: any(s["name"] == "Sim1" and (s.get("led_view") or {}).get("colour") == "green"
+                                             for s in d.state()["robots"]), d)
+            sim1 = next(s for s in d.state()["robots"] if s["name"] == "Sim1")
+            self.assertEqual(sim1["reply"]["pose"][:2], [-1000, 500])
+            self.assertTrue(next(s for s in d.state()["robots"] if s["name"] == "Sim3")["claim"]["who"].startswith("Kim"))
+
+            # deployed with the guard: the robot stands still until the page sends RUN, and again after STOP
+            _, data = d.action({"action": "deploy", "robot": "Sim2", "player": 2, "guard": True, "build": True})
+            self.wait_for("deploy", lambda: d.jobs[data["job"]].state != "running", d, timeout=120)
+            self.assertEqual(d.jobs[data["job"]].state, "ok", "\n".join(d.jobs[data["job"]].lines))
+            self.assertIn("--no-build", "\n".join(d.jobs[data["job"]].lines))
+            self.wait_for("guard stop", lambda: lab.robot("Sim2").emergency is True, d)
+            self.assertTrue(self.sent("robot2", practice.emergency_command(True)))
+            d.action({"action": "guard", "robot": "Sim2", "released": True})
+            self.wait_for("guard run", lambda: lab.robot("Sim2").emergency is False, d)
+            d.action({"action": "guard", "robot": "Sim2", "released": False})
+            self.wait_for("guard stop again", lambda: lab.robot("Sim2").emergency is True, d)
+            self.assertFalse(lab.robot("Sim1").emergency)      # the others are not affected
+
+            # STOP ALL: every robot limp and stopped
+            d.action({"action": "stop_all"})
+            self.wait_for("stop all", lambda: all(not r.software_running() and r.emergency for r in lab.robots), d)
+        finally:
+            if d is not None:
+                d.close()
+            else:
+                lab.close()
+            self.sim.close()
+            self.assertEqual(core.ROOT, real[0])
+            self.assertIs(core.tcp_open, real[1])
+            self.assertEqual(os.environ.get("BH_SSH"), real[3].get("BH_SSH"))
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()

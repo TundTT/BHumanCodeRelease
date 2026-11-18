@@ -20,6 +20,7 @@ every day         bh deploy NAME            build, copy, verify, start
                   bh status                 battery, temperature, state of all robots
                   bh logs NAME -f           follow what the robot says
                   bh dash                   the same with buttons: deploy, policies, guard, LEDs
+                  bh dash --practice        learn the page on simulated robots first
                   bh connect NAME           full mission control (SimRobot attached)
 safety            bh deploy NAME --guard    robot moves only while 'bh guard' runs
                   bh guard                  dead-man switch (ENTER = run/stop)

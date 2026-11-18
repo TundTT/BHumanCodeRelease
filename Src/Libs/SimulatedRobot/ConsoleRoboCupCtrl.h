@@ -8,11 +8,13 @@
 
 #pragma once
 
+#include <memory>
 #include <set>
 #include <QDir>
 #include <QString>
 
 #include "BHToolBar.h"
+#include "Network/UdpComm.h"
 #include "RoboCupCtrl.h"
 #include "RobotConsole.h"
 
@@ -50,6 +52,17 @@ private:
   const RobotConsole::PlotViews* plotViews = nullptr; /**< Points to the map of plot views used for tab-completion. */
   BHToolBar toolBar; /**< The toolbar shown for this controller. */
   QString statusText; /**< The text to be printed in the status bar. */
+  std::unique_ptr<UdpComm> practiceBridge; /**< Link to "bh dash --practice" on this computer (only if BH_PRACTICE_PORT is set). */
+  unsigned timeWhenPracticeStateSent = 0; /**< When the game state was last sent to "bh dash --practice" (real time). */
+
+  /**
+   * Opens the link to "bh dash --practice" if the environment variable BH_PRACTICE_PORT names a port:
+   * console commands are received on 127.0.0.1:port, the game state is sent to 127.0.0.1:port+1.
+   */
+  void openPracticeBridge();
+
+  /** Executes the commands received from "bh dash --practice" and sends it the game state twice a second. */
+  void updatePracticeBridge();
 
 public:
   /**

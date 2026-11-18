@@ -22,6 +22,7 @@ import json
 import os
 import re
 import secrets
+import signal
 import threading
 import time
 import webbrowser
@@ -145,7 +146,9 @@ def run_cli(argv: Sequence[str]) -> int:
 
 class Dashboard:
     def __init__(self, targets: List[Target], interval: float, passive: bool,
-                 test_gc: Optional[gcmod.TestGameController], guard: Optional[guardmod.Guard]):
+                 test_gc: Optional[gcmod.TestGameController], guard: Optional[guardmod.Guard],
+                 practice=None):
+        self.practice = practice                         # practice.PracticeLab with --practice
         self.targets = targets
         self.interval = interval
         self.passive = passive
@@ -164,9 +167,12 @@ class Dashboard:
         self.last_ui_contact = 0.0
         self.running = True
         self.poll_now = threading.Event()
+        self.listener_error = None
+        if practice is not None:                         # the simulator's game, never the network's
+            self.listener = practice.bridge
+            return
         try:
             self.listener: Optional[gcmod.Listener] = gcmod.Listener()
-            self.listener_error = None
         except BhError as e:
             self.listener = None
             self.listener_error = str(e)
@@ -211,6 +217,8 @@ class Dashboard:
     def state(self) -> dict:
         self.last_ui_contact = time.time()
         own_team = gcmod.own_team_number()
+        if self.practice is not None:                    # the practice robots are the simulator's first team
+            own_team = self.practice.bridge.first_team() or own_team
         game = None
         g = None
         if self.listener:
@@ -258,6 +266,7 @@ class Dashboard:
             robots.append(s)
         return {"time": time.time(), "team": own_team, "robots": robots, "game": game, "me": self.me,
                 "testgc": self.test_gc is not None, "passive": self.passive,
+                "practice": self.practice.info() if self.practice is not None else None,
                 "guard": {"enabled": self.guard is not None, "released": bool(self.guard and self.guard.released)},
                 "jobs": jobs, "messages": messages, "legend": LED_LEGEND}
 
@@ -391,6 +400,13 @@ class Dashboard:
             return "heartbeat ended", None
         if kind.startswith("gc_"):
             return self.gc_action(kind, body), None
+        if kind == "practice_stand":
+            if self.practice is None:
+                raise BhError("only in practice (bh dash --practice): on a real robot hold its STAND button for 2 s")
+            self.target(robot)
+            message = self.practice.press_stand(robot)
+            self.log(message)
+            return message, None
         if kind == "deploy":
             t = self.target(robot)
             argv = ["deploy", robot]
@@ -412,7 +428,7 @@ class Dashboard:
                                 ("ignore_claim", "--ignore-claim")):
                 if flag(key):
                     argv.append(option)
-            if not flag("build"):
+            if not flag("build") or self.practice is not None:   # practice robots get a stand-in binary
                 argv.append("--no-build")
             job = self.start_job("deploy %s" % robot, [robot], True, lambda: run_cli(argv))
             return "deploy of %s started" % t.label, {"job": job.id}
@@ -435,6 +451,8 @@ class Dashboard:
                                  [], True, lambda: run_cli(argv))
             return "started", {"job": job.id}
         if kind == "sim":
+            if self.practice is not None:
+                raise BhError("in practice the simulator is already running")
             model = str(body.get("model") or "k1")
             if model not in ("k1", "t1"):
                 raise BhError("unknown robot type")
@@ -509,7 +527,9 @@ class Dashboard:
             g.close()
         if self.test_gc:
             self.test_gc.stop()
-        if self.listener:
+        if self.practice is not None:
+            self.practice.close()                        # also closes the listener (its bridge)
+        elif self.listener:
             self.listener.close()
 
 
@@ -725,23 +745,49 @@ def make_handler(dash: Dashboard):
     return Handler
 
 
+def start_practice(args):
+    """--practice: stand-in robots driven by SimRobot (see practice.py). Returns the lab and the targets."""
+    from . import practice
+    if args.robots or args.gc or args.guard or args.passive:
+        raise BhError("--practice makes its own robots and GameController; leave out robot names, --gc, "
+                      "--guard and --passive")
+    lab = practice.PracticeLab(args.model, args.scene, args.count, args.sim_config, args.sim_port, args.headless)
+    lab.find_simulator()
+    say("Practice: setting up %d stand-in robot(s) in %s ..." % (lab.count, lab.base))
+    names = lab.prepare()
+    try:
+        lab.start()
+    except BaseException:
+        lab.close()
+        raise
+    say("Practice: SimRobot plays %s (%s): %s are its first team robot%s. Nothing reaches a real robot."
+        % (lab.scene, args.model.upper(), ", ".join(names), "s 1-%d" % len(names) if len(names) > 1 else " 1"))
+    return lab, core.resolve_targets(names, prefer="lan")
+
+
 def cmd_dash(args) -> int:
     if args.who:
         os.environ["BH_USER"] = share.clean(args.who, 40)
-    targets = core.resolve_targets(args.robots) if (args.robots or core.load_robots()) else []
-    test_gc = gcmod.start_test_gc(args.robots, args.players, 0, False) if args.gc else None
+    port = args.port or (8090 if args.practice else 8089)
+    lab = None
+    if args.practice:
+        lab, targets = start_practice(args)
+        test_gc = lab.gc
+    else:
+        targets = core.resolve_targets(args.robots) if (args.robots or core.load_robots()) else []
+        test_gc = gcmod.start_test_gc(args.robots, args.players, 0, False) if args.gc else None
     guard = None
     if args.guard:
         guard = guardmod.Guard(guardmod.guard_ips([t.robot.name if t.robot else t.ip for t in targets]))
         guard.start()
-    dash = Dashboard(targets, args.interval, args.passive, test_gc, guard)
+    dash = Dashboard(targets, args.interval, args.passive, test_gc, guard, practice=lab)
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(dash))
+        server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(dash))
     except OSError as e:
         dash.close()
-        raise BhError("cannot open port %d (%s) - try --port" % (args.port, e))
+        raise BhError("cannot open port %d (%s) - try --port" % (port, e))
     threading.Thread(target=dash.poll_loop, daemon=True).start()
-    url = "http://127.0.0.1:%d/?t=%s" % (args.port, dash.token)
+    url = "http://127.0.0.1:%d/?t=%s" % (port, dash.token)
     say("Dashboard: %s" % url)
     say("Watching %d robot(s) as %s%s%s%s. Ctrl+C to quit."
         % (len(targets), dash.me, " (passive: no ssh, GameController only)" if args.passive else "",
@@ -751,6 +797,12 @@ def cmd_dash(args) -> int:
             webbrowser.open(url)
         except Exception:
             pass
+
+    def quit_on_signal(signum, frame):
+        raise KeyboardInterrupt                          # clean up as with Ctrl+C: guards STOP, simulator ends
+    for name in ("SIGTERM", "SIGHUP"):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), quit_on_signal)
     try:
         server.serve_forever(poll_interval=0.3)
     except KeyboardInterrupt:
@@ -772,6 +824,15 @@ def add_parser(sub) -> None:
     p.add_argument("--passive", action="store_true", help="never contact the robots (only listen to the GameController)")
     p.add_argument("--interval", type=float, default=4.0, help="seconds between robot polls (default 4)")
     p.add_argument("--as", dest="who", help="your name as others see it on claimed robots (default: git user name)")
-    p.add_argument("--port", type=int, default=8089)
+    p.add_argument("--port", type=int, help="where to serve the page (default 8089, with --practice 8090)")
     p.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
+    q = p.add_argument_group("practice on simulated robots (nothing reaches a real robot)")
+    q.add_argument("--practice", action="store_true",
+                   help="stand-in robots Sim1, Sim2, ... whose bodies are SimRobot's first team")
+    q.add_argument("--model", choices=["k1", "t1"], default="k1", help="robot type (default k1)")
+    q.add_argument("--scene", help="SimRobot game scene (default: GameFast3v3 for K1, GameFast for T1)")
+    q.add_argument("--count", type=int, default=0, help="how many practice robots (default: up to 3)")
+    q.add_argument("--sim-config", choices=core.BUILD_CONFIGS, default="Develop", help="SimRobot build (default Develop)")
+    q.add_argument("--sim-port", type=int, default=10990, help="UDP port of the link to SimRobot (default 10990)")
+    q.add_argument("--headless", action="store_true", help="SimRobot without a window")
     p.set_defaults(func=cmd_dash)
