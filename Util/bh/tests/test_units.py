@@ -191,6 +191,7 @@ class RobotStatus(unittest.TestCase):
         self.assertIn(("warn", "battery 35% - change it before a game"), remote.assess(s))
         self.assertEqual(remote.assess({"reachable": False, "error": "nope"}), [("fail", "nope")])
         self.assertFalse(remote.parse_status("@host x\n")["complete"])
+        self.assertTrue(remote.parse_status("@log x\n\n@end\n")["complete"])
         self.assertIsNone(remote.parse_status("@internal \n@end")["battery"])
         self.assertEqual(remote.describe({"name": "A", "ip": "1.2.3.4", "reachable": False, "error": "x"})[2], "OFFLINE")
 
@@ -226,6 +227,29 @@ class RobotStatus(unittest.TestCase):
         self.assertEqual(s["cron"], ["@reboot /home/booster/run.sh"])
         self.assertTrue(s["complete"])
         self.assertFalse(robots.analyse_scan(robots.parse_scan("@host x"))["complete"])
+
+    def test_status_script_survives_a_log_cut_off_by_a_stop(self):
+        # Seen on a robot: the newest log ended in thousands of zero bytes and no line break, so "@end" was
+        # appended to that line and the dashboard showed a reachable robot as offline.
+        import shutil
+        import subprocess
+        import tempfile
+        from tests import fakerobot
+        tmp = Path(tempfile.mkdtemp(prefix="bhstatus"))
+        try:
+            bash = fakerobot.find_bash(tmp)
+            if bash is None:
+                self.skipTest("no bash found that can run the repository scripts")
+            (tmp / "logs").mkdir()
+            (tmp / "logs" / "bhumand_1.log").write_bytes(b"started\nunexpected calib size \xe2\x80\x93 resyncing\n" + b"\0" * 4000)
+            out = subprocess.run([bash, "-c", remote.STATUS_SCRIPT.replace("cd /home/booster", "cd .")], cwd=str(tmp),
+                                 capture_output=True, timeout=60).stdout.decode("utf-8", "replace")
+            s = remote.parse_status(out)
+            self.assertTrue(s["complete"])
+            self.assertEqual(s["log"][:2], ["started", "unexpected calib size – resyncing"])
+            self.assertTrue(all("\0" not in line and len(line) <= 300 for line in s["log"]))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 class WillItRun(unittest.TestCase):

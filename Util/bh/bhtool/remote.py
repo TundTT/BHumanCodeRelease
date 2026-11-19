@@ -48,7 +48,10 @@ for f in /var/volatile/tmp/ledState.txt /run/user/*/ledState.txt; do
 done
 echo "@model $(grep -o 'Booster [A-Z0-9]*' /opt/booster/robot_info.txt 2>/dev/null | head -1)"
 f=$(ls -t logs/bhumand_*.log 2>/dev/null | head -1)
-[ -n "$f" ] && tail -n 6 "$f" | sed 's/^/@log /'
+# a log cut off by a stop can end in zero bytes without a line break: drop them, keep lines short, and
+# start a new line before "@end" so that the end marker is always found
+[ -n "$f" ] && tail -n 6 "$f" | tr -d '\000' | cut -c1-300 | sed 's/^/@log /'
+echo
 echo "@end"
 '''
 
