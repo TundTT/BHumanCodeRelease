@@ -229,8 +229,10 @@ def will_it_run(s: dict) -> List[tuple]:
         add("fail", "camera stream is stuck in a loop: %d times in the last 20000 log lines (with the reconnects "
                     "after it): %s - the software "
                     "gets no calibration and no images that way. The receiver (Util/X5Camera/include/"
-                    "cam_stream_receiver.cpp) and the program on the camera board must come from the same "
-                    "version%s" % (n, text, " (camera package %s)" % s["camera_package"] if s["camera_package"] else ""))
+                    "cam_stream_receiver.cpp) understands the original cam_stream (490 bytes) and Booster's "
+                    "(858 bytes, stacked images); '(expected 490)' alone means the software on the robot is older "
+                    "than that - deploy again%s" % (n, text, " (camera package %s)" % s["camera_package"]
+                                                    if s["camera_package"] else ""))
     for n, text in others[:3]:
         add("warn", "a line fills the log (%d times in the last 20000 lines): %s" % (n, text))
     if s["newest_log"] and not s["log_repeats"]:

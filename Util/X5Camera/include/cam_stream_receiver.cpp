@@ -81,6 +81,84 @@ struct __attribute__((packed)) CalibPayload {
 };
 static_assert(sizeof(CalibPayload) == 490, "CalibPayload size mismatch");
 
+// The CALIB payload of Booster's own cam_stream on the X5 (booster-x5-camera 1.0.2, robot firmware 1.8.x).
+// Layout read from the stream of a K1: the raw calibration as above, then the rectification rotations,
+// the capture size, rectified intrinsics and projection matrices of both cameras, baseline and Q.
+// That cam_stream sends both images in one frame, left above right (see split_stacked()).
+struct __attribute__((packed)) CalibPayloadBooster {
+    uint16_t width;
+    uint16_t height;
+    char     distortion_model[24];
+    uint8_t  d_num_l;
+    uint8_t  d_num_r;
+    double   l_fx, l_fy, l_cx, l_cy;
+    double   l_d[8];
+    double   r_fx, r_fy, r_cx, r_cy;
+    double   r_d[8];
+    double   R[9];
+    double   T[3];
+    double   R1[9];             // rectification rotation, left
+    double   R2[9];             // rectification rotation, right
+    uint16_t capture_width;
+    uint16_t capture_height;    // of the whole frame, i.e. both images when they are stacked
+    double   rect_l_fx, rect_l_fy, rect_l_cx, rect_l_cy;
+    double   rect_r_fx, rect_r_fy, rect_r_cx, rect_r_cy;
+    double   P1[12];            // 3×4 projection, left
+    double   P2[12];            // 3×4 projection, right
+    double   rect_baseline;
+    double   Q[16];
+};
+static_assert(sizeof(CalibPayloadBooster) == 858, "CalibPayloadBooster size mismatch");
+
+// Convert Booster's calibration into the one this receiver hands out. The rectified size is that of one
+// camera image, because stacked frames are split before they are delivered.
+static CalibPayload from_booster(const CalibPayloadBooster &b) {
+    CalibPayload cp{};
+    cp.width = b.width;
+    cp.height = b.height;
+    std::memcpy(cp.distortion_model, b.distortion_model, sizeof(cp.distortion_model));
+    cp.d_num_l = b.d_num_l;
+    cp.d_num_r = b.d_num_r;
+    cp.l_fx = b.l_fx; cp.l_fy = b.l_fy; cp.l_cx = b.l_cx; cp.l_cy = b.l_cy;
+    std::memcpy(cp.l_d, b.l_d, sizeof(cp.l_d));
+    cp.r_fx = b.r_fx; cp.r_fy = b.r_fy; cp.r_cx = b.r_cx; cp.r_cy = b.r_cy;
+    std::memcpy(cp.r_d, b.r_d, sizeof(cp.r_d));
+    std::memcpy(cp.R, b.R, sizeof(cp.R));
+    std::memcpy(cp.T, b.T, sizeof(cp.T));
+    cp.capture_width = b.capture_width;
+    cp.capture_height = b.capture_height > b.capture_width ? static_cast<uint16_t>(b.capture_height / 2)
+                                                           : b.capture_height;
+    cp.rect_fx = b.rect_l_fx; cp.rect_fy = b.rect_l_fy; cp.rect_cx = b.rect_l_cx; cp.rect_cy = b.rect_l_cy;
+    cp.rect_baseline = b.rect_baseline;
+    std::memcpy(cp.Q, b.Q, sizeof(cp.Q));
+    return cp;
+}
+
+// Booster's cam_stream sends one frame per capture on channel 0 with the left image above the right one
+// (e.g. 544×896 for two 544×448 images). Frames taller than wide are such pairs: split them into a left
+// (channel 0) and a right (channel 1) frame like the ones the original cam_stream sends.
+static bool is_stacked(uint16_t width, uint16_t height) {
+    return height > width && height % 4 == 0;
+}
+
+static void split_stacked(const CamFrame &f, CamFrame &left, CamFrame &right) {
+    const size_t w = f.width, h = f.height / 2u;  // size of one image
+    for (CamFrame *out : {&left, &right}) {
+        out->frame_id = f.frame_id;
+        out->timestamp_ns = f.timestamp_ns;
+        out->width = f.width;
+        out->height = static_cast<uint16_t>(h);
+        out->nv12.resize(w * h * 3 / 2);
+    }
+    left.channel = 0;
+    right.channel = 1;
+    const uint8_t *y = f.nv12.data(), *uv = y + w * f.height;  // UV has f.height / 2 rows of w bytes
+    std::memcpy(left.nv12.data(), y, w * h);
+    std::memcpy(right.nv12.data(), y + w * h, w * h);
+    std::memcpy(left.nv12.data() + w * h, uv, w * h / 2);
+    std::memcpy(right.nv12.data() + w * h, uv + w * h / 2, w * h / 2);
+}
+
 // ── recv helper ───────────────────────────────────────────────────────────────
 // Reads exactly `len` bytes.  Returns false on disconnect, error, or if
 // `running` goes false mid-read (checked after each short recv timeout).
@@ -294,26 +372,46 @@ struct CamStreamReceiver::Impl {
                     if (!recv_all(fd, f.nv12.data(), f.nv12.size(), running))
                         break;
 
-                    stat_frames.fetch_add(1, std::memory_order_relaxed);
-                    if (frame_cb) frame_cb(f);
-                    try_pair(std::move(f));
+                    if (f.nv12.size() != size_t(f.width) * f.height * 3 / 2) {
+                        fprintf(stderr,
+                                "[cam_stream_receiver] frame %ux%u with %zu bytes"
+                                " – resyncing\n", f.width, f.height, f.nv12.size());
+                        break;
+                    }
+
+                    if (f.channel == 0 && is_stacked(f.width, f.height)) {
+                        CamFrame left, right;
+                        split_stacked(f, left, right);
+                        stat_frames.fetch_add(2, std::memory_order_relaxed);
+                        if (frame_cb) { frame_cb(left); frame_cb(right); }
+                        try_pair(std::move(left));
+                        try_pair(std::move(right));
+                    } else {
+                        stat_frames.fetch_add(1, std::memory_order_relaxed);
+                        if (frame_cb) frame_cb(f);
+                        try_pair(std::move(f));
+                    }
 
                 } else if (magic == CALIB_MAGIC) {
                     uint32_t payload_len;
                     if (!recv_all(fd, &payload_len, sizeof(payload_len),
                                   running)) break;
 
-                    if (payload_len != sizeof(CalibPayload)) {
+                    if (payload_len == sizeof(CalibPayload)) {
+                        CalibPayload cp;
+                        if (!recv_all(fd, &cp, sizeof(cp), running)) break;
+                        handle_calib(cp);
+                    } else if (payload_len == sizeof(CalibPayloadBooster)) {
+                        CalibPayloadBooster b;
+                        if (!recv_all(fd, &b, sizeof(b), running)) break;
+                        handle_calib(from_booster(b));
+                    } else {
                         fprintf(stderr,
                                 "[cam_stream_receiver] unexpected calib size"
-                                " %u (expected %zu) – resyncing\n",
-                                payload_len, sizeof(CalibPayload));
+                                " %u (expected %zu or %zu) – resyncing\n",
+                                payload_len, sizeof(CalibPayload), sizeof(CalibPayloadBooster));
                         break;
                     }
-
-                    CalibPayload cp;
-                    if (!recv_all(fd, &cp, sizeof(cp), running)) break;
-                    handle_calib(cp);
 
                 } else {
                     fprintf(stderr,
