@@ -468,6 +468,22 @@ class Flows(unittest.TestCase):
             core.write_exact(walk_cfg, text)
         self.ok("policy", "check")
 
+    def test_13_deploy_refuses_a_robot_named_differently(self):
+        # Seen on a K1 with the factory hostname "robot" registered as Robot5: the robot software read
+        # Config/Robots/robot/, so the laptop guard deployed into Config/Robots/Robot5/ was not in effect.
+        hostname = self.alice / "bin" / "hostname"
+        original = hostname.read_text()
+        try:
+            fakerobot._script(hostname, "#!/bin/bash\necho robot\n")
+            binary = (self.robot_cfg(self.alice) / "bhuman").read_bytes()
+            out = self.fails("deploy", "Alice", "--no-build", "--guard")
+            self.assertIn("hostname 'robot'", out)
+            self.assertIn("laptop guard", out)
+            self.assertEqual((self.robot_cfg(self.alice) / "bhuman").read_bytes(), binary)   # nothing copied
+        finally:
+            fakerobot._script(hostname, original)
+        self.assertIn("Dry run", self.ok("deploy", "Alice", "--no-build", "--dry-run"))
+
     def test_13_dry_run_touches_nothing(self):
         before = (self.alice / "service.state").read_text()
         binary = (self.robot_cfg(self.alice) / "bhuman").read_bytes()

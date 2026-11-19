@@ -74,6 +74,23 @@ def robot_build_dir(config: str) -> Optional[Path]:
     return None
 
 
+def check_hostname(target: core.Target) -> None:
+    """The robot software names itself after the hostname (Src/Apps/Booster/Main.cpp) and reads
+    Config/Robots/<hostname>/. Deployed under another name, the robot's own files - its calibration and the
+    laptop guard's threads.cfg - are not used, and nothing else would tell."""
+    if not target.robot:
+        return
+    r = core.ssh_run(target.ip, "hostname", timeout=10)
+    host = r.out.strip()
+    if r.ok and host and host != target.robot.name:
+        raise BhError("%s answers with the hostname '%s', but is registered here as '%s'. The robot software "
+                      "would read Config/Robots/%s/ and ignore Config/Robots/%s/ - with it the robot's calibration "
+                      "and the laptop guard. Register it under its hostname (bh robot remove %s, then bh robot add "
+                      "%s --id ...) or give it this name (bh robot install %s)."
+                      % (target.label, host, target.robot.name, host, target.robot.name, target.robot.name, host,
+                         target.robot.name))
+
+
 def build_robot(config: str) -> None:
     say("== Building the robot software (%s)" % config)
     if core.is_macos():
@@ -386,6 +403,7 @@ def deploy(jobs: List[Job], args) -> int:
     for job in jobs:
         if not core.tcp_open(job.target.ip, timeout=2):
             raise BhError("%s is not reachable" % job.target.label)
+        check_hostname(job.target)
         share.respect_claim(job.target, getattr(args, "ignore_claim", False))
         rescue(job.target, args.overwrite_calibration, args.cache_sync)
     if args.dry_run:
