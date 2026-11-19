@@ -192,6 +192,14 @@ class RobotStatus(unittest.TestCase):
         self.assertEqual(remote.assess({"reachable": False, "error": "nope"}), [("fail", "nope")])
         self.assertFalse(remote.parse_status("@host x\n")["complete"])
         self.assertTrue(remote.parse_status("@log x\n\n@end\n")["complete"])
+        # Booster's battery reading is used only while the robot software reports none, and only when recent
+        s = remote.parse_status("@internal \n@now 1000\n@boosterbattery 950 77.4\n@end\n")
+        self.assertEqual((s["battery"], s["battery_source"]), (77, "Booster"))
+        s = remote.parse_status("@internal 0.5 40\n@now 1000\n@boosterbattery 950 77.4\n@end\n")
+        self.assertEqual((s["battery"], s["battery_source"]), (50, "robot software"))
+        stale = 1000 - remote.BOOSTER_BATTERY_MAX_AGE - 1
+        self.assertIsNone(remote.parse_status("@now 1000\n@boosterbattery %d 77.4\n@end\n" % stale).get("battery"))
+        self.assertIsNone(remote.parse_status("@now 1000\n@boosterbattery 950 \n@end\n").get("battery"))   # failed read
         self.assertIsNone(remote.parse_status("@internal \n@end")["battery"])
         self.assertEqual(remote.describe({"name": "A", "ip": "1.2.3.4", "reachable": False, "error": "x"})[2], "OFFLINE")
 

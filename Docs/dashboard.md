@@ -64,7 +64,9 @@ Each card, from top to bottom:
   lasted half a second, so the short test-mode flashes do not show). A robot whose software is older than
   this shows "LED unknown" until it is deployed again; a robot whose software is stopped shows a grey LED;
 - five tiles: battery, hottest joint, robot computer, wireless, free disk - grey while normal, amber or red
-  with an icon when not (hover a tile for its limits);
+  with an icon when not (hover a tile for its limits). The robot software reports the battery while it runs;
+  while it is stopped, the battery is read from Booster's own battery service about once a minute and the
+  tile says "battery (Booster)" - the first reading appears a few seconds after the page starts;
 - problems and warnings that the state badge and the guard row do not already show (crash report, battery
   low, joint hot, disk nearly full, calibration not pulled), worst first. Click one for what to do;
 - the **Guard** row, for a robot deployed with the laptop guard: its state (**may move** in green or

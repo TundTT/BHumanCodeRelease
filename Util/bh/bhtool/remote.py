@@ -20,6 +20,7 @@ from .core import BhError, Target, say
 TEMP_HOT, TEMP_VERY_HOT, TEMP_CRITICAL = 76, 88, 100
 CPU_HOT = 85
 BATTERY_LOW = {"k1": 40, "t1": 20, "": 30}
+BOOSTER_BATTERY_MAX_AGE = 300   # s; Booster's battery reading (taken while the robot software is off) is older
 
 STATUS_SCRIPT = r'''
 cd /home/booster 2>/dev/null
@@ -47,6 +48,24 @@ for f in /var/volatile/tmp/ledState.txt /run/user/*/ledState.txt; do
   [ -r "$f" ] && { echo "@ledstate $(stat -c %Y "$f") $(head -n 1 "$f")"; break; }
 done
 echo "@model $(grep -o 'Booster [A-Z0-9]*' /opt/booster/robot_info.txt 2>/dev/null | head -1)"
+# While the robot software is not running, nobody writes the battery level: read it from Booster's own
+# battery topic instead. That takes about 3 s (Python and DDS discovery), so it runs in the background at
+# most once a minute and this script reports the last reading.
+bf="${XDG_RUNTIME_DIR:-/tmp}/bhBoosterBattery.txt"
+if ! systemctl --user is-active -q bhuman.service 2>/dev/null && [ -d /opt/booster ]; then
+  [ -e "$bf" ] && echo "@boosterbattery $(stat -c %Y "$bf") $(head -n 1 "$bf")"
+  if [ $(( $(date +%s) - $(stat -c %Y "$bf.try" 2>/dev/null || echo 0) )) -gt 60 ]; then
+    touch "$bf.try"
+    FASTRTPS_DEFAULT_PROFILES_FILE=/opt/booster/BoosterRos2/fastdds_profile.xml nohup timeout 10 python3 -c '
+import threading, booster_robotics_sdk_python as b
+e = threading.Event(); r = []
+def h(m):
+    if not e.is_set(): r.append(m.soc); e.set()
+b.ChannelFactory.Instance().Init(0); s = b.B1BatteryStateSubscriber(h); s.InitChannel()
+if e.wait(5): open(__import__("sys").argv[1], "w").write("%.1f\n" % r[0])
+' "$bf" </dev/null >/dev/null 2>&1 &
+  fi
+fi
 f=$(ls -t logs/bhumand_*.log 2>/dev/null | head -1)
 # a log cut off by a stop can end in zero bytes without a line break: drop them, keep lines short, and
 # start a new line before "@end" so that the end marker is always found
@@ -82,7 +101,7 @@ def parse_led_report(parts: Sequence[str], robot_time: Optional[int]) -> Optiona
 def parse_status(output: str) -> dict:
     """Turn the output of STATUS_SCRIPT into a dictionary."""
     s: dict = {"zones": [], "log": [], "complete": False}
-    claim, led_report = "", []
+    claim, led_report, booster_battery = "", [], []
     for line in output.splitlines():
         if not line.startswith("@"):
             continue
@@ -144,6 +163,8 @@ def parse_status(output: str) -> dict:
             claim = value
         elif key == "backups":
             s["backups"] = int(value) if value.isdigit() else 0
+        elif key == "boosterbattery":
+            booster_battery = value.split()
         elif key == "ledstate":
             led_report = value.split()
         elif key == "log":
@@ -151,6 +172,14 @@ def parse_status(output: str) -> dict:
     # Both depend on the robot's clock, which is reported on another line.
     s["claim"] = share.parse_claim(claim, s.get("robot_time"))
     s["led_report"] = parse_led_report(led_report, s.get("robot_time"))
+    # Booster's own reading, only used while the robot software reports none (it is not running).
+    s["battery_source"] = "robot software" if s.get("battery") is not None else None
+    if s.get("battery") is None and len(booster_battery) == 2 and booster_battery[0].isdigit():
+        soc, now = _num(booster_battery[1]), s.get("robot_time")
+        age = now - int(booster_battery[0]) if now is not None else None
+        if soc is not None and 0 <= soc <= 100 and age is not None and age <= BOOSTER_BATTERY_MAX_AGE:
+            s["battery"] = int(round(soc))
+            s["battery_source"] = "Booster"
     return s
 
 

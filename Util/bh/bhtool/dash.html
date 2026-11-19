@@ -553,7 +553,11 @@ function renderGauges(box, s) {
   box.textContent = "";
   if (!s.reachable) { box.append(h("div", {class: "muted small"}, s.reachable == null ? "Checking…" : s.error || "not reachable")); return; }
   const lvl = s.battery_level === "ok" ? "" : s.battery_level;
-  box.append(stat("battery", "battery", "Battery (reported by the robot software while it runs; warning below 40 %)", s.battery != null ? s.battery + " %" : "?", lvl));
+  const fromBooster = s.battery_source === "Booster";
+  box.append(stat("battery", fromBooster ? "battery (Booster)" : "battery",
+    "Battery, reported by the robot software while it runs; while it is stopped, read from Booster's own battery " +
+    "service about once a minute (the first reading takes a few seconds). Warning below 40 %",
+    s.battery != null ? s.battery + " %" : "?", lvl));
   const t = s.max_temp, tl = t == null ? "" : t >= 88 ? "fail" : t >= 76 ? "warn" : "";
   box.append(stat("joint", "hottest joint", "Hottest joint motor (hot from 76 C, very hot from 88 C)", t != null ? t + " °C" : "?", tl));
   const z = s.zones && s.zones.length ? Math.max(...s.zones) : null, zl = z != null && z >= 85 ? "warn" : "";
@@ -571,7 +575,7 @@ const EXPLAIN = [
   [/robot software is not running/, "The program that controls the robot is stopped, so the robot is limp. Press Start when the robot sits or is held; it starts limp, then hold STAND on the robot for 2 s."],
   [/crashed/, "The robot software ended with an error. More → Log and Crash report show why. Start runs it again."],
   [/crash dump/, "An earlier run left a crash report on the robot. More → Crash report shows it - it usually names the module that failed."],
-  [/battery level unknown/, "The robot software reports the battery only while it runs. If it runs and this stays unknown, More → Check robot tells you whether the robot can write its status file."],
+  [/battery level unknown/, "The robot software reports the battery while it runs; while it is stopped, the page reads it from Booster's battery service, which takes a few seconds the first time. If the software runs and this stays unknown, More → Check robot tells you whether the robot can write its status file."],
   [/below the/, "Change the battery now: with a low battery the motors sag and the robot falls more."],
   [/change it before a game/, "Enough for short tests, not for a game."],
   [/cool down/, "Very hot motors lose strength and can be damaged. Let the robot sit (Stop makes it limp) for a few minutes."],
