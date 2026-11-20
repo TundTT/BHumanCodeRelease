@@ -472,9 +472,9 @@ def deploy(jobs: List[Job], args) -> int:
         say("%d robot(s) FAILED - see above." % failed)
         return 1
     if args.restart:
-        say("Done. Robots start limp. To stand one up: hold STAND for 2 s (magenta, \"Prepare\"), then WALK for 2 s")
-        say("while it is upright. Without a GameController, a short press of STAND or WALK then switches between")
-        say("playing and penalized. F1 makes the robot limp again; afterwards hold F1 for 2 s (\"Body ready\").")
+        say("Done. Robots start limp. To stand one up: hold F1 for 2 s (\"Body ready\"), then STAND for 2 s (magenta,")
+        say("\"Prepare\"), then WALK for 2 s while it is upright. Without a GameController, a short press of STAND or")
+        say("WALK then switches between playing and penalized. A short press of F1 makes the robot limp again.")
         if args.guard:
             say("Guard is armed: run 'bh guard %s' and press ENTER there to let the robots move."
                 % " ".join(j.target.robot.name for j in jobs))
@@ -547,7 +547,7 @@ def cmd_match(args) -> int:
     if rc == 0 and not args.dry_run:
         say("")
         say("Match checklist:")
-        say("  1. Robots on the field, hold STAND for 2 s, then WALK for 2 s each. Back LED: solid white = GameController heard,")
+        say("  1. Robots on the field, hold F1, STAND, then WALK for 2 s each. Back LED: solid white = GameController heard,")
         say("     blinking white = NOT heard (bh gc doctor). From here on the GameController is in charge.")
         say("  2. Close the dashboard and any ssh sessions - nothing may talk to the robots during the game.")
         say("  3. After the game: bh logs <robot> --download")

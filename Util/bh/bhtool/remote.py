@@ -289,9 +289,29 @@ def cmd_status(args) -> int:
     return 0 if all(s.get("reachable") for s in stats) else 1
 
 
+# On a K1 set up for the button routing, starting and stopping bhuman.service also restarts Booster's daemon
+# (ExecStartPre / ExecStopPost, about 30 s; the unit allows 600 s). A start is only done when that is done.
+# A stop is done - the robot is limp - as soon as the robot software has ended; the daemon restart after it is
+# not waited for.
+SERVICE_TIMEOUT = {"start": 150, "restart": 180, "stop": 30}
+
+
+def service_script(verb: str) -> str:
+    if verb == "stop":
+        return ("systemctl --user stop --no-block %s\n"
+                "for i in $(seq 60); do pgrep -x bhuman >/dev/null 2>&1 || exit 0; sleep 0.25; done\n"
+                "echo 'the robot software is still running 15 s after the stop' >&2\n"
+                "exit 3\n") % core.SERVICE
+    return "systemctl --user %s %s\n" % (verb, core.SERVICE)
+
+
+def run_service(t: Target, verb: str) -> core.Remote:
+    return core.ssh_run(t.ip, service_script(verb), timeout=SERVICE_TIMEOUT[verb])
+
+
 def _service(verb: str, targets: Sequence[Target]) -> int:
     def run(t: Target) -> Tuple[Target, core.Remote]:
-        return t, core.ssh_run(t.ip, "systemctl --user %s %s" % (verb, core.SERVICE), timeout=20)
+        return t, run_service(t, verb)
 
     rc = 0
     with ThreadPoolExecutor(max_workers=max(1, min(8, len(targets)))) as pool:
@@ -313,7 +333,7 @@ def cmd_stop(args) -> int:
 
 def cmd_start(args) -> int:
     rc = _service("start", core.resolve_targets(args.robots, all_robots=args.all))
-    say("Robots start limp. Hold the STAND button about 2 s to make one stand up.")
+    say('Robots start limp. To stand one up: hold F1 for 2 s ("Body ready"), then STAND for 2 s, then WALK for 2 s.')
     return rc
 
 

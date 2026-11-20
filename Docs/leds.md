@@ -7,6 +7,7 @@ the robot is in; a mode decides what it shows in addition.
 
 | LED | Meaning | What to do |
 |---|---|---|
+| blue, steady | the motors are still with Booster's firmware (after a start or F1); this is Booster's own LED | hold F1 for 2 s ("Body ready") |
 | blue, blinking | limp (unstiff) | hold STAND for 2 s to make it stiffen |
 | magenta | stiff, ready pose ("Prepare") | hold WALK for 2 s while it is upright and still |
 | white | standing, waiting: *initial* or *finished* | |

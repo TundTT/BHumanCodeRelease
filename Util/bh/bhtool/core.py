@@ -612,10 +612,16 @@ def explain_ssh_failure(target: Target, result: Remote) -> str:
     """Human-readable reason for an ssh failure."""
     if not tcp_open(target.ip):
         return "%s is not reachable (powered on? same network? try: ping %s)" % (target.label, target.ip)
-    if result.rc == 255:
+    message = (result.err or result.out).strip()
+    if result.rc == 255 and message.startswith("timed out after"):
+        return ("%s: no answer, the command %s - it may still be running on the robot; "
+                "check the card or 'bh status'" % (target.label, message))
+    if result.rc == 255 and "Permission denied" in message:
         return ("%s refused the team ssh key - the robot is not set up for this code yet "
                 "(run: bh robot install <name>)" % target.label)
-    return "%s: %s" % (target.label, (result.err or result.out).strip() or "exit code %d" % result.rc)
+    if result.rc == 255:
+        return "%s: ssh failed: %s" % (target.label, message.splitlines()[-1] if message else "exit code 255")
+    return "%s: %s" % (target.label, message or "exit code %d" % result.rc)
 
 
 def local_ipv4() -> List[str]:

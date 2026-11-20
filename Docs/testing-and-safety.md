@@ -27,18 +27,21 @@
 Useful options: `--team`, `--scenario`, `--location`, `--profile` (wireless profile from `Install/Profiles`),
 `--volume`, `--color`, `--goalie-color`, `--magic`, `--delete-logs`, `--dry-run` (all checks, nothing copied).
 
-After the start the robot is limp (back LED blinks blue). To stand it up (K1):
+After the start the robot is limp, and on the K1 the motors stay with Booster's firmware (damping mode) until
+somebody at the robot hands them over - the robot software checks the body once and then switches back to
+damping on purpose. To stand it up (K1):
 
-1. Set it on its feet and hold it.
-2. Hold **STAND for 2 seconds**: it stiffens and holds a ready pose (LED magenta, it says "Prepare").
-3. Hold **WALK for 2 seconds** while it is upright and still: it says "Walk" and is active. If the LED
+1. Hold **F1 for about 2 seconds**: it says "Body ready" - the robot software now has the motors (still limp,
+   back LED blinks blue). Until then it ignores STAND and WALK.
+2. Set it on its feet and hold it.
+3. Hold **STAND for 2 seconds**: it stiffens and holds a ready pose (LED magenta, it says "Prepare").
+4. Hold **WALK for 2 seconds** while it is upright and still: it says "Walk" and is active. If the LED
    blinks fast instead, it is tilted or moving - steady it and hold WALK again.
 
 Without a GameController it is now *penalized* (LED red, stands still); each short press of STAND or WALK
 switches between *playing* (LED green) and *penalized*.
 
-**F1 makes it limp again at any time.** After F1 the robot ignores STAND and WALK until you hold **F1 for about
-2 seconds** - it says "Body ready" - then stand it up as above.
+**A short press of F1 makes it limp at any time** (back to damping mode); afterwards start again at step 1.
 
 ## Layers of control
 

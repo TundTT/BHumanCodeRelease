@@ -581,7 +581,7 @@ function renderGauges(box, s) {
 
 // ---------------------------------------------------------------- issues with explanations
 const EXPLAIN = [
-  [/robot software is not running/, "The program that controls the robot is stopped, so the robot is limp. Press Start when the robot sits or is held; it starts limp, then hold STAND on the robot for 2 s, then WALK for 2 s."],
+  [/robot software is not running/, "The program that controls the robot is stopped, so the robot is limp. Press Start when the robot sits or is held; it starts limp, then hold F1 on the robot for 2 s, then STAND for 2 s, then WALK for 2 s."],
   [/crashed/, "The robot software ended with an error. More → Log and Crash report show why. Start runs it again."],
   [/crash dump/, "An earlier run left a crash report on the robot. More → Crash report shows it - it usually names the module that failed."],
   [/battery level unknown/, "The robot software reports the battery while it runs; while it is stopped, the page reads it from Booster's battery service, which takes a few seconds the first time. If the software runs and this stays unknown, More → Check robot tells you whether the robot can write its status file."],
@@ -635,7 +635,7 @@ function renderHead(box, s, st) {
   if (!st.passive && s.reachable)
     power = s.service === "active"
       ? h("button", {class: "hardstop power", title: "Hard stop: ends the robot software, the robot goes limp at once (hold it). Does not ask.", onclick: () => act({action: "stop", robot: name})}, icon("stop"), "Stop")
-      : h("button", {class: "power", title: "Starts the robot software. The robot starts limp; then hold STAND on the robot for 2 s, then WALK for 2 s.", onclick: () => act({action: "start", robot: name})}, icon("play"), "Start");
+      : h("button", {class: "power", title: "Starts the robot software. The robot starts limp; then hold F1 on the robot for 2 s, then STAND for 2 s, then WALK for 2 s.", onclick: () => act({action: "start", robot: name})}, icon("play"), "Start");
   box.append(h("div", {class: "row1"}, h("span", {class: "name"}, name), h("span", {class: "state " + sw[0], title: sw[3]}, icon(sw[2]), sw[1]),
     h("span", {class: "chip", title: "robot type"}, (s.model || "").toUpperCase() || "?"), power),
     h("div", {class: "sub"}, s.ip + (s.hardware ? " · " + s.hardware : "") + (s.backups ? " · " + s.backups + " backup" + (s.backups === 1 ? "" : "s") + " on the robot" : "")));
@@ -949,7 +949,7 @@ function driveDialog(name) {
   const body = h("div", {},
     h("div", {style: "display:grid;grid-template-columns:1fr 120px;gap:12px"},
       h("div", {},
-        h("p", {}, "Robot standing and active: hold ", k("STAND"), " on the robot for 2 s, then ", k("WALK"), " for 2 s. Opening this dialog puts it under remote control (it says \"Remote drive\", its LED blinks slowly) - it then only does what the keys say."),
+        h("p", {}, "Robot standing and active: hold ", k("F1"), ", then ", k("STAND"), ", then ", k("WALK"), " on the robot for 2 s each. Opening this dialog puts it under remote control (it says \"Remote drive\", its LED blinks slowly) - it then only does what the keys say."),
         status, keyboard),
       h("div", {class: "figure"}, fig, cap)),
     gamepad,

@@ -98,7 +98,7 @@ Hovering any button shows the matching `bh` command and what it does.
 
 **Driving with the keyboard** (More → **Drive**), for a robot deployed with "Arm the laptop guard":
 
-1. Stand the robot up (STAND 2 s, then WALK 2 s) and press **RUN** on its Guard row.
+1. Stand the robot up (F1 2 s, then STAND 2 s, then WALK 2 s) and press **RUN** on its Guard row.
 2. Open Drive. The robot says "Remote drive", its LED blinks slowly, and it stands until you press keys.
 3. Hold **W** / **S** to walk forward / back, **A** / **D** to walk left / right, **Q** / **E** to turn left /
    right; keys combine. The slider sets the speed in percent of the robot's maximum (default 30 %, remembered).

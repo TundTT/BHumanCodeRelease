@@ -36,6 +36,7 @@ from .core import BhError, Target, say
 
 # Must say the same as Src/Modules/BehaviorControl/LEDHandler/LEDHandler.cpp and Docs/leds.md.
 LED_LEGEND = [
+    ["blue, steady", "on the robot: motors not handed over yet (after start or F1) - hold F1 2 s"],
     ["blue, blinking", "limp (unstiff) - hold STAND 2 s"],
     ["magenta", "stiff, ready pose - hold WALK 2 s"],
     ["white", "initial / finished"],
@@ -338,12 +339,13 @@ class Dashboard:
         raise BhError("unknown robot %r" % name)
 
     def service(self, verb: str, targets: List[Target]) -> None:
-        def work() -> None:
-            for t in targets:
-                r = core.ssh_run(t.ip, "systemctl --user %s %s" % (verb, core.SERVICE), timeout=20)
-                self.log("%s %s: %s" % (verb, t.label, "ok" if r.ok else core.explain_ssh_failure(t, r)))
+        """One thread per robot: a stop must not wait for another robot, and a start on a K1 takes ~30 s."""
+        def work(t: Target) -> None:
+            r = remote.run_service(t, verb)
+            self.log("%s %s: %s" % (verb, t.label, "done" if r.ok else core.explain_ssh_failure(t, r)))
             self.poll_now.set()
-        threading.Thread(target=work, daemon=True).start()
+        for t in targets:
+            threading.Thread(target=work, args=(t,), daemon=True).start()
 
     def robot_guard(self, name: str, create: bool) -> Optional[guardmod.Guard]:
         with self.lock:

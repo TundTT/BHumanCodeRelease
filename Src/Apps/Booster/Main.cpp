@@ -13,7 +13,6 @@
 #include <booster/robot/channel/channel_publisher.hpp>
 #include <booster/robot/channel/channel_subscriber.hpp>
 #include <booster/robot/device/light/light_control_client.hpp>
-#include <atomic>
 #include <csignal>
 #include <cstdio>
 #include <cstring>
@@ -211,34 +210,16 @@ public:
 
 static EmergencyHandler emergencyHandler;
 
-/**
- * Button events received within this time after subscribing are ignored (in ms). Right after connecting, a
- * subscriber can receive an event that nobody pressed, and a default-constructed ButtonEventMsg is
- * "button 0 (F1), PRESS_DOWN": the K1 then switched to damping mode 0.2 s after every start and only a long
- * press of F1 brought it back (firmware 1.8.1). The robot is limp during this time anyway: the motors are
- * off after start and standing up needs STAND to be held for 2 s.
- */
-constexpr unsigned buttonEventGracePeriod = 1000;
-static std::atomic<unsigned> timeWhenButtonEventsAccepted{0};
-
 static void buttonEventHandler(const void* msg)
 {
   const booster_interface::msg::ButtonEventMsg& buttonEvent = *reinterpret_cast<const booster_interface::msg::ButtonEventMsg*>(msg);
   if(buttonEvent.button() == 0) // F1
   {
-    if(Time::getRealSystemTime() < timeWhenButtonEventsAccepted)
-    {
-      fprintf(stderr, "F1: ignoring event %u received right after start.\n", static_cast<unsigned>(buttonEvent.event()));
-      return;
-    }
     switch(emergencyHandler.state)
     {
       case EmergencyHandler::noEmergency:
         if(buttonEvent.event() == booster_interface::msg::PRESS_DOWN)
-        {
-          fprintf(stderr, "F1: pressed, switching to damping mode.\n");
           emergencyHandler.setState(EmergencyHandler::emergencyPressed);
-        }
         break;
       case EmergencyHandler::emergencyPressed:
         if(buttonEvent.event() == booster_interface::msg::PRESS_UP)
@@ -246,10 +227,7 @@ static void buttonEventHandler(const void* msg)
         break;
       case EmergencyHandler::emergencyReleased:
         if(buttonEvent.event() == booster_interface::msg::LONG_PRESS_START)
-        {
-          fprintf(stderr, "F1: long press, switching to custom mode.\n");
           emergencyHandler.setState(EmergencyHandler::noEmergency);
-        }
     }
   }
 }
@@ -449,7 +427,6 @@ int main(int argc, char* argv[])
       // Listen to the F1 button on the K1 or to disconnected joints on the T1.
       if(settings.robotType == Settings::k1)
       {
-        timeWhenButtonEventsAccepted = Time::getRealSystemTime() + buttonEventGracePeriod;
         buttonEventSubscriber.InitChannel();
         emergencyHandler.setState(EmergencyHandler::noEmergency);
       }

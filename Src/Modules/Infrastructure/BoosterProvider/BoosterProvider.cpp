@@ -61,7 +61,6 @@ BoosterProvider::BoosterProvider()
   connectedJoints = lowCmd.motor_cmd().size();
   if(Global::getSettings().robotType == Settings::k1)
   {
-    timeWhenButtonEventsAccepted = Time::getRealSystemTime() + buttonEventGracePeriod;
     buttonEventSubscriber.InitChannel();
 
     // Force to set LEDs at least once.
@@ -132,8 +131,6 @@ void BoosterProvider::update(SystemSensorData& theSystemSensorData)
 void BoosterProvider::buttonEventHandler(const booster_interface::msg::ButtonEventMsg& buttonEvent)
 {
   const booster_interface::msg::ButtonEventType event = buttonEvent.event();
-  if(Time::getRealSystemTime() < timeWhenButtonEventsAccepted)
-    return;
   if(event == booster_interface::msg::PRESS_DOWN || event == booster_interface::msg::PRESS_UP)
   {
     const int button = buttonEvent.button();
@@ -250,7 +247,10 @@ void BoosterProvider::robotStatusHandler(const booster_interface::msg::RobotStat
   SYNC;
 
   const std::vector<booster_interface::msg::RobotDdsBatteryStatus>& batteryStatuses = robotStatus.battery_vec();
-  if(!batteryStatuses.empty())
+  // After Booster's daemon (re)started - on a K1 with the button routing at every start of this software -
+  // its status reports 0 % for about 30 s until the battery was read. 0 % means "no reading yet": it stays
+  // unknown (SensorData::off) instead of triggering "Unknown battery level".
+  if(!batteryStatuses.empty() && batteryStatuses.front().soc() > 0.f)
     systemSensorData.batteryLevel = batteryStatuses.front().soc() * 0.01f;
 
   connectedJoints = 0;

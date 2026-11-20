@@ -400,6 +400,34 @@ class Sharing(unittest.TestCase):
             self.assertIsNone(dash.UPLOAD_NAME.match(bad), bad)
 
 
+class SshFailures(unittest.TestCase):
+    def test_only_a_refused_login_is_blamed_on_the_key(self):
+        from types import SimpleNamespace
+        t = SimpleNamespace(ip="10.0.0.5", label="robot (10.0.0.5)")
+        saved = core.tcp_open
+        core.tcp_open = lambda ip, port=22, timeout=0.8: True
+        try:
+            timeout = core.explain_ssh_failure(t, core.Remote(255, "", "timed out after 20s"))
+            self.assertIn("no answer", timeout)
+            self.assertNotIn("key", timeout)
+            self.assertIn("refused the team ssh key",
+                          core.explain_ssh_failure(t, core.Remote(255, "", "booster@10.0.0.5: Permission denied (publickey).")))
+            other = core.explain_ssh_failure(t, core.Remote(255, "", "kex_exchange_identification: Connection closed"))
+            self.assertIn("Connection closed", other)
+            self.assertNotIn("key -", other)
+        finally:
+            core.tcp_open = saved
+
+    def test_service_commands_allow_for_the_daemon_restart_on_the_k1(self):
+        # ExecStartPre/ExecStopPost of the robot's bhuman.service restart Booster's daemon (~30 s).
+        self.assertGreaterEqual(remote.SERVICE_TIMEOUT["start"], 90)
+        self.assertGreaterEqual(remote.SERVICE_TIMEOUT["restart"], 90)
+        stop = remote.service_script("stop")
+        self.assertIn("--no-block", stop)                   # done when the software has ended, not the daemon
+        self.assertIn("pgrep -x bhuman", stop)
+        self.assertGreater(remote.SERVICE_TIMEOUT["stop"], 15)  # the script itself gives up after 15 s
+
+
 class Guard(unittest.TestCase):
     def test_guard_can_be_armed_in_every_shipped_thread_configuration(self):
         files = sorted((REPO / "Config" / "Scenarios").glob("*/*/threads.cfg"))
@@ -449,9 +477,9 @@ class Guard(unittest.TestCase):
         rx.bind(("127.0.0.1", 0))
         rx.settimeout(1.0)
         d = guard.Driver(["127.0.0.1"], port=rx.getsockname()[1])
+        d.set(1.0, 0.0, 0.0)                                 # before the loop runs, so it sends no stop first
         d.start()
         try:
-            d.set(1.0, 0.0, 0.0)
             self.assertEqual(rx.recv(64), b"drive 1.000 0.000 0.000\x00")
             time.sleep(guard.DRIVE_FRESH + 0.3)               # the page stopped asking
             while True:
