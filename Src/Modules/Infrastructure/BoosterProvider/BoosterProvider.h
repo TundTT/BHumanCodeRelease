@@ -109,6 +109,10 @@ class BoosterProvider : public BoosterProviderBase, public Thread
   unsigned armPositionWarning = 0; /**< Arms are not correctly rotated and was said at this timestamp. */
   PixelTypes::RGBPixel ledState; /**< The current state of the leds. **/
   unsigned timeWhenTemperatureRead = 0; /**< The last time the temperature was read. */
+  /** Button events received within this time after subscribing are ignored (in ms), like in Main.cpp: a
+   *  default-constructed ButtonEventMsg reads as "F1 pressed down", which would stay pressed until released. */
+  static constexpr unsigned buttonEventGracePeriod = 1000;
+  unsigned timeWhenButtonEventsAccepted = 0; /**< Button events before this time are ignored. Set before subscribing. */
   static constexpr size_t numOfThermalZones = 2; /**< The number of thermal zones read in the CPU/GPU. */
   int zoneTemperatureFiles[numOfThermalZones]; /**< The file descriptors where the thermal zone temperatures can be read from. */
 #endif

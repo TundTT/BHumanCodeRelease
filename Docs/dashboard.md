@@ -89,12 +89,28 @@ Each card, from top to bottom:
 | More → | Same as | Note |
 |---|---|---|
 | **Hold STAND** (practice only) | - | what holding STAND on the robot for 2 s does |
-| **Drive with gamepad** | - | the gamepad buttons, with the robot's LED live (it blinks slowly while the gamepad is in control) |
+| **Drive** | - | drive with the keyboard - below - or see the gamepad buttons; the robot's LED live (it blinks slowly while it is remote controlled) |
 | **Penalize** / **Unpenalize** (with `--gc`) | test GameController | |
 | **Back up**, **Restore** | `bh robot backup`, `bh robot restore` | Restore lists the backups on the robot |
 | **Check robot**, **Log**, **Crash report** | `bh robot scan`, `bh logs`, `bh logs --crash` | read only |
 
 Hovering any button shows the matching `bh` command and what it does.
+
+**Driving with the keyboard** (More → **Drive**), for a robot deployed with "Arm the laptop guard":
+
+1. Stand the robot up (STAND 2 s, then WALK 2 s) and press **RUN** on its Guard row.
+2. Open Drive. The robot says "Remote drive", its LED blinks slowly, and it stands until you press keys.
+3. Hold **W** / **S** to walk forward / back, **A** / **D** to walk left / right, **Q** / **E** to turn left /
+   right; keys combine. The slider sets the speed in percent of the robot's maximum (default 30 %, remembered).
+   Release all keys and it stands.
+4. Close the dialog: it says "Remote drive off" and goes back to what it did before - a robot that was
+   *playing* plays (moves) again, so press a short STAND first if it should stay put (penalized).
+
+The keys only count while the dialog is open and the window has the focus. The page repeats the command ten
+times a second; the robot stops driving 0.5 s after the last one, so a closed tab, a sleeping laptop or a
+lost network stops it by itself. STOP on the Guard row overrides driving. Only robots deployed with the guard
+listen (`RemoteDriveProvider`, UDP 9911, switched on together with the guard), so a match deployment can never
+be driven from a laptop. The gamepad needs none of this: its receiver is on the robot.
 
 - **Details** - team and player number, scenario, location, load, memory, uptime, when it was deployed, and
   the last lines of its log, including everything it said aloud.
@@ -164,7 +180,7 @@ What happens to a practice robot happens to its simulated body, as it would to a
 |---|---|
 | **Stop**, **STOP ALL**, **More → Restore** (software stopped) | goes limp and falls |
 | **Start**, **Restart**, **Deploy** (software started again) | stays limp, like a real robot after a restart: the LED blinks blue |
-| **More → Hold STAND** (practice only; on a real robot: set it on its feet, hold STAND for 2 s) | stands up |
+| **More → Hold STAND** (practice only; on a real robot: set it on its feet, hold STAND for 2 s, then WALK for 2 s) | stands up |
 | **Deploy** with "Arm the laptop guard", then the Guard row **RUN** / **STOP** | stands still until RUN, moves while the page sends RUN, stands still again after STOP, closing the page or 1 s without RUN |
 | test GameController buttons (initial ... finished, goals, **Penalize**, **FREEZE**) | the simulator's GameController; FREEZE makes the robots stand still |
 

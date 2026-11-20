@@ -37,7 +37,7 @@ from .core import BhError, Target, say
 # Must say the same as Src/Modules/BehaviorControl/LEDHandler/LEDHandler.cpp and Docs/leds.md.
 LED_LEGEND = [
     ["blue, blinking", "limp (unstiff) - hold STAND 2 s"],
-    ["magenta", "getting ready to stand up"],
+    ["magenta", "stiff, ready pose - hold WALK 2 s"],
     ["white", "initial / finished"],
     ["white, blinking", "match mode only: initial / finished and NO GameController heard"],
     ["light blue", "ready (walking to its position)"],
@@ -47,7 +47,7 @@ LED_LEGEND = [
     ["orange", "calibration mode"],
     ["short blue flash", "test mode only: playing, but the ball was not seen for 3 s"],
     ["short red flash", "test mode only: battery low or a joint very hot (dark flash if the LED is red or orange)"],
-    ["any colour, slow blinking", "gamepad remote control is active"],
+    ["any colour, slow blinking", "remote control (gamepad or Drive dialog) is active"],
     ["any colour, fast blinking", "cannot do what was requested yet (e.g. still standing up)"],
 ]
 
@@ -155,6 +155,7 @@ class Dashboard:
         self.test_gc = test_gc
         self.guard = guard                               # --guard: one heartbeat for all robots
         self.robot_guards: Dict[str, guardmod.Guard] = {}  # heartbeats started from the page, per robot
+        self.drivers: Dict[str, guardmod.Driver] = {}       # keyboard driving from the Drive dialog, per robot
         self.token = secrets.token_urlsafe(16)
         self.me = share.me()
         self.lock = threading.Lock()
@@ -355,8 +356,42 @@ class Dashboard:
             self.log("guard for %s: heartbeat started (STOP)" % name)
         return g
 
+    def end_drive(self, name: str) -> None:
+        with self.lock:
+            d = self.drivers.pop(name, None)
+        if d:
+            d.close()
+            self.log("drive %s: ended" % name)
+
+    def drive(self, name: str, body: dict) -> str:
+        """The Drive dialog's keys, repeated by the page about ten times per second while it is open."""
+        if self.practice is not None:
+            raise BhError("keyboard driving needs a real robot deployed with the laptop guard; "
+                          "in practice use the gamepad help or the simulator")
+        t = self.target(name)
+        if not body.get("on"):
+            self.end_drive(name)
+            return "drive ended"
+        if not (self.status.get(name) or {}).get("guard"):
+            raise BhError("%s was not deployed with the laptop guard - Deploy with 'Arm the laptop guard' first; "
+                          "only such a robot can be driven from here" % name)
+        try:
+            forward, sideways, rotation = (float(body.get(k) or 0) for k in ("forward", "sideways", "rotation"))
+        except (TypeError, ValueError):
+            raise BhError("drive: forward, sideways and rotation must be numbers")
+        with self.lock:
+            d = self.drivers.get(name)
+        if d is None:
+            d = guardmod.Driver(guardmod.guard_ips([t.robot.name if t.robot else t.ip]))
+            d.start()
+            with self.lock:
+                self.drivers[name] = d
+            self.log("drive %s: started" % name)
+        d.set(forward, sideways, rotation)
+        return "ok"
+
     ROBOT_CONTACT = {"stop", "start", "restart", "stop_all", "deploy", "policy_push", "claim", "release", "backup",
-                     "restore", "list_backups", "scan", "logs", "guard_heartbeat"}
+                     "restore", "list_backups", "scan", "logs", "guard_heartbeat", "drive"}
 
     def action(self, body: dict) -> Tuple[str, object]:
         kind = str(body.get("action") or "")
@@ -367,7 +402,11 @@ class Dashboard:
         if kind in ("stop", "start", "restart"):
             self.service(kind, [self.target(robot)])
             return "%s requested" % kind, None
+        if kind == "drive":
+            return self.drive(robot, body), None
         if kind == "stop_all":
+            for name in list(self.drivers):
+                self.end_drive(name)
             for g in self.all_guards():
                 g.set_released(False)
             if self.test_gc:
@@ -523,6 +562,8 @@ class Dashboard:
 
     def close(self) -> None:
         self.running = False
+        for name in list(self.drivers):
+            self.end_drive(name)
         for g in self.all_guards():
             g.close()
         if self.test_gc:

@@ -161,6 +161,34 @@ option((SkillBehaviorControl) HandleJoystick,
         Say({.text = "Remote control activated"});
         goto active;
       }
+      if(theRemoteDriveRequest.active && !theMotionInfo.isMotion(MotionPhase::playDead))
+      {
+        Say({.text = "Remote drive"});
+        goto remoteDrive;
+      }
+    }
+  }
+
+  // The dashboard drives the robot (keyboard). This ends by itself as soon as
+  // the dashboard stops sending, see RemoteDriveProvider.
+  state(remoteDrive)
+  {
+    transition
+    {
+      if(!theRemoteDriveRequest.active)
+      {
+        Say({.text = "Remote drive off"});
+        goto inactive;
+      }
+    }
+    action
+    {
+      BehaviorStateRemoteControlActive();
+      LookForward();
+      if(theRemoteDriveRequest.speed != Pose2f())
+        WalkAtRelativeSpeed({.speed = theRemoteDriveRequest.speed});
+      else
+        Stand();
     }
   }
 

@@ -237,16 +237,28 @@ def rescue(target: Target, overwrite_calibration: bool, sync_cache: bool) -> Non
 # Laptop guard (dead-man switch) and LED mode
 # --------------------------------------------------------------------------
 
-_GUARD_DEFAULT = re.compile(r"^[ \t]*EmergencyButtonState,[ \t]*\r?\n", re.M)
-_GUARD_PROVIDER = re.compile(r"^([ \t]*)//[ \t]*(\{representation = EmergencyButtonState; provider = EmergencyButtonProvider;\},)", re.M)
+def _default_line(representation: str) -> "re.Pattern[str]":
+    return re.compile(r"^[ \t]*%s,[ \t]*\r?\n" % representation, re.M)
+
+
+def _provider_line(representation: str, provider: str) -> "re.Pattern[str]":
+    return re.compile(r"^([ \t]*)//[ \t]*(\{representation = %s; provider = %s;\},)" % (representation, provider), re.M)
+
+
+# The guard's network stop and the dashboard's keyboard driving (RemoteDriveProvider) are switched on together:
+# a robot can only be driven from a laptop while that laptop's guard can also stop it.
+GUARDED_MODULES = (("EmergencyButtonState", "EmergencyButtonProvider"), ("RemoteDriveRequest", "RemoteDriveProvider"))
 
 
 def guard_threads_cfg(text: str) -> str:
-    """Thread configuration with the network emergency stop switched on."""
-    if len(_GUARD_DEFAULT.findall(text)) != 1 or len(_GUARD_PROVIDER.findall(text)) != 1:
-        raise BhError("this threads.cfg does not have the expected EmergencyButtonProvider lines; "
-                      "cannot arm the guard automatically")
-    return _GUARD_PROVIDER.sub(r"\1\2", _GUARD_DEFAULT.sub("", text))
+    """Thread configuration with the network emergency stop and remote driving switched on."""
+    for representation, provider in GUARDED_MODULES:
+        default, line = _default_line(representation), _provider_line(representation, provider)
+        if len(default.findall(text)) != 1 or len(line.findall(text)) != 1:
+            raise BhError("this threads.cfg does not have the expected %s lines; cannot arm the guard automatically"
+                          % provider)
+        text = line.sub(r"\1\2", default.sub("", text))
+    return text
 
 
 def walk_limits(model: str, robot: str, scenario: str, location: str) -> Optional[Tuple[float, float, float, Path]]:
@@ -460,8 +472,9 @@ def deploy(jobs: List[Job], args) -> int:
         say("%d robot(s) FAILED - see above." % failed)
         return 1
     if args.restart:
-        say("Done. Robots start limp: hold STAND for 2 s to make one stand up. Without a GameController, a short")
-        say("press of STAND or WALK then switches between playing and penalized. F1 makes the robot limp again.")
+        say("Done. Robots start limp. To stand one up: hold STAND for 2 s (magenta, \"Prepare\"), then WALK for 2 s")
+        say("while it is upright. Without a GameController, a short press of STAND or WALK then switches between")
+        say("playing and penalized. F1 makes the robot limp again; afterwards hold F1 for 2 s (\"Body ready\").")
         if args.guard:
             say("Guard is armed: run 'bh guard %s' and press ENTER there to let the robots move."
                 % " ".join(j.target.robot.name for j in jobs))
@@ -534,7 +547,7 @@ def cmd_match(args) -> int:
     if rc == 0 and not args.dry_run:
         say("")
         say("Match checklist:")
-        say("  1. Robots on the field, hold STAND for 2 s each. Back LED: solid white = GameController heard,")
+        say("  1. Robots on the field, hold STAND for 2 s, then WALK for 2 s each. Back LED: solid white = GameController heard,")
         say("     blinking white = NOT heard (bh gc doctor). From here on the GameController is in charge.")
         say("  2. Close the dashboard and any ssh sessions - nothing may talk to the robots during the game.")
         say("  3. After the game: bh logs <robot> --download")

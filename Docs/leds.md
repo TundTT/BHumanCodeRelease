@@ -7,15 +7,15 @@ the robot is in; a mode decides what it shows in addition.
 
 | LED | Meaning | What to do |
 |---|---|---|
-| blue, blinking | limp (unstiff) | hold STAND for 2 s to make it stand up |
-| magenta | getting ready to stand up | wait |
+| blue, blinking | limp (unstiff) | hold STAND for 2 s to make it stiffen |
+| magenta | stiff, ready pose ("Prepare") | hold WALK for 2 s while it is upright and still |
 | white | standing, waiting: *initial* or *finished* | |
 | light blue | *ready* - walking to its position | |
 | yellow | *set* - waiting for the kick-off | |
 | green | *playing* | |
 | red | penalized (by the referee or by a button press) | |
 | orange | calibration mode | [calibration.md](calibration.md) |
-| any colour, slow blinking | a gamepad controls the robot | |
+| any colour, slow blinking | a gamepad or the dashboard's Drive dialog controls the robot | |
 | any colour, fast blinking | the robot cannot do what was requested yet, e.g. it is still standing up | wait; if it stays, look at `bh logs NAME` |
 
 ## Match mode

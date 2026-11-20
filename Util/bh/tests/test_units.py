@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import re
 import sys
+import time
 import unittest
 from pathlib import Path
 
@@ -406,10 +407,11 @@ class Guard(unittest.TestCase):
         for f in files:
             text = core.read_exact(f)
             armed = deploy.guard_threads_cfg(text)
-            self.assertEqual(len(armed.splitlines()), len(text.splitlines()) - 1, f)
-            self.assertNotIn("//{representation = EmergencyButtonState", armed)
-            self.assertRegex(armed, r"\n\s*\{representation = EmergencyButtonState; provider = EmergencyButtonProvider;\},")
-            self.assertNotRegex(armed, r"(?m)^\s*EmergencyButtonState,\s*$")
+            self.assertEqual(len(armed.splitlines()), len(text.splitlines()) - 2, f)
+            for representation, provider in deploy.GUARDED_MODULES:
+                self.assertNotIn("//{representation = %s" % representation, armed)
+                self.assertRegex(armed, r"\n\s*\{representation = %s; provider = %s;\}," % (representation, provider))
+                self.assertNotRegex(armed, r"(?m)^\s*%s,\s*$" % representation)
             core.parse_cfg(armed)
             with self.assertRaises(core.BhError):
                 deploy.guard_threads_cfg(armed)            # already armed: refuse instead of guessing
@@ -424,6 +426,41 @@ class Guard(unittest.TestCase):
         self.assertIn('"noemergency"', src)
         self.assertIn('"emergency"', src)
         self.assertEqual((guard.RELEASE, guard.STOP), (b"noemergency\x00", b"emergency\x00"))
+
+    def test_robot_listens_where_the_dashboard_drives(self):
+        from bhtool import guard
+        src = (REPO / "Src/Modules/Infrastructure/RemoteDriveProvider/RemoteDriveProvider.cpp").read_text()
+        cfg = core.read_cfg(core.find_config("remoteDriveProvider.cfg", "k1"))
+        self.assertEqual(int(cfg["udpPort"]), guard.DRIVE_PORT)
+        self.assertNotEqual(guard.DRIVE_PORT, guard.PORT)
+        # Several commands fit into the time after which the robot stops driving on its own, and the page's
+        # updates go stale before that.
+        self.assertGreaterEqual(int(cfg["maxWaitTimeMillis"]), 4 * guard.DRIVE_INTERVAL * 1000)
+        self.assertLess(guard.DRIVE_FRESH * 1000, int(cfg["maxWaitTimeMillis"]))
+        self.assertIn('"drive %f %f %f"', src)
+        self.assertIn('"drive stop"', src)
+        self.assertEqual(guard.drive_payload(0.5, -1.0, 0.25), b"drive 0.500 -1.000 0.250\x00")
+        self.assertEqual(guard.drive_payload(3, -7, float("nan")), b"drive 1.000 -1.000 0.000\x00")
+
+    def test_drive_sends_while_the_page_keeps_asking_and_stops_by_itself(self):
+        import socket
+        from bhtool import guard
+        rx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        rx.bind(("127.0.0.1", 0))
+        rx.settimeout(1.0)
+        d = guard.Driver(["127.0.0.1"], port=rx.getsockname()[1])
+        d.start()
+        try:
+            d.set(1.0, 0.0, 0.0)
+            self.assertEqual(rx.recv(64), b"drive 1.000 0.000 0.000\x00")
+            time.sleep(guard.DRIVE_FRESH + 0.3)               # the page stopped asking
+            while True:
+                packet = rx.recv(64)
+                if packet == guard.DRIVE_STOP:
+                    break
+        finally:
+            d.close()
+        rx.close()
 
 
 class Simulation(unittest.TestCase):

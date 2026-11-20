@@ -61,6 +61,7 @@ BoosterProvider::BoosterProvider()
   connectedJoints = lowCmd.motor_cmd().size();
   if(Global::getSettings().robotType == Settings::k1)
   {
+    timeWhenButtonEventsAccepted = Time::getRealSystemTime() + buttonEventGracePeriod;
     buttonEventSubscriber.InitChannel();
 
     // Force to set LEDs at least once.
@@ -131,6 +132,8 @@ void BoosterProvider::update(SystemSensorData& theSystemSensorData)
 void BoosterProvider::buttonEventHandler(const booster_interface::msg::ButtonEventMsg& buttonEvent)
 {
   const booster_interface::msg::ButtonEventType event = buttonEvent.event();
+  if(Time::getRealSystemTime() < timeWhenButtonEventsAccepted)
+    return;
   if(event == booster_interface::msg::PRESS_DOWN || event == booster_interface::msg::PRESS_UP)
   {
     const int button = buttonEvent.button();

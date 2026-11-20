@@ -11,7 +11,7 @@
     each simulated robot's back LED there).
   * What happens to a practice robot happens to its simulated body, as it would to a real robot:
       software stopped (Stop, STOP ALL, restore) or started (Start, Restart, deploy) -> limp, it falls;
-      "More → Hold STAND" on its card makes it stand up (on a real robot: set it on its feet, hold STAND for 2 s);
+      "More → Hold STAND" on its card makes it stand up (on a real robot: set it on its feet, hold STAND for 2 s, then WALK for 2 s);
       deployed with the guard -> it stands still unless the page sends RUN, exactly as with the real guard;
       the test GameController buttons -> the simulator's GameController.
 """

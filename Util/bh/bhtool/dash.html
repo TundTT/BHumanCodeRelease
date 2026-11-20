@@ -244,6 +244,15 @@
   .dialog .buttons { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
   .dialog .buttons button { min-height: 34px; padding: 6px 14px; }
   .dialog ol { padding-left: 20px; } .dialog li { margin: 6px 0; }
+  .drive { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; margin-top: 10px; }
+  .drivepad { display: grid; grid-template-columns: repeat(3, 64px); gap: 6px; }
+  .dk { border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 8px; background: var(--chip); height: 56px;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none; }
+  .dk b { font-size: 18px; } .dk span { font-size: 11px; color: var(--muted); }
+  .dk.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .dk.on span { color: var(--accent-ink); }
+  .drivespeed { display: block; }
+  .drivespeed input[type=range] { display: block; width: 100%; margin: 6px 0 4px; }
   .key { display: inline-block; border: 1px solid var(--line); border-bottom-width: 3px; border-radius: 6px; padding: 0 6px; font-weight: 700; font-size: 12.5px; background: var(--chip); }
   #toast { position: fixed; right: 16px; bottom: 64px; z-index: 11; background: var(--ink); color: var(--bg); padding: 9px 14px; border-radius: 8px; display: none; max-width: 70vw; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
   .help { padding: 14px 16px; display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
@@ -572,7 +581,7 @@ function renderGauges(box, s) {
 
 // ---------------------------------------------------------------- issues with explanations
 const EXPLAIN = [
-  [/robot software is not running/, "The program that controls the robot is stopped, so the robot is limp. Press Start when the robot sits or is held; it starts limp, then hold STAND on the robot for 2 s."],
+  [/robot software is not running/, "The program that controls the robot is stopped, so the robot is limp. Press Start when the robot sits or is held; it starts limp, then hold STAND on the robot for 2 s, then WALK for 2 s."],
   [/crashed/, "The robot software ended with an error. More → Log and Crash report show why. Start runs it again."],
   [/crash dump/, "An earlier run left a crash report on the robot. More → Crash report shows it - it usually names the module that failed."],
   [/battery level unknown/, "The robot software reports the battery while it runs; while it is stopped, the page reads it from Booster's battery service, which takes a few seconds the first time. If the software runs and this stays unknown, More → Check robot tells you whether the robot can write its status file."],
@@ -626,7 +635,7 @@ function renderHead(box, s, st) {
   if (!st.passive && s.reachable)
     power = s.service === "active"
       ? h("button", {class: "hardstop power", title: "Hard stop: ends the robot software, the robot goes limp at once (hold it). Does not ask.", onclick: () => act({action: "stop", robot: name})}, icon("stop"), "Stop")
-      : h("button", {class: "power", title: "Starts the robot software. The robot starts limp; then hold STAND on the robot for 2 s.", onclick: () => act({action: "start", robot: name})}, icon("play"), "Start");
+      : h("button", {class: "power", title: "Starts the robot software. The robot starts limp; then hold STAND on the robot for 2 s, then WALK for 2 s.", onclick: () => act({action: "start", robot: name})}, icon("play"), "Start");
   box.append(h("div", {class: "row1"}, h("span", {class: "name"}, name), h("span", {class: "state " + sw[0], title: sw[3]}, icon(sw[2]), sw[1]),
     h("span", {class: "chip", title: "robot type"}, (s.model || "").toUpperCase() || "?"), power),
     h("div", {class: "sub"}, s.ip + (s.hardware ? " · " + s.hardware : "") + (s.backups ? " · " + s.backups + " backup" + (s.backups === 1 ? "" : "s") + " on the robot" : "")));
@@ -669,7 +678,7 @@ function renderActions(box, s, st) {
   const menu = h("div", {class: "menu", role: "menu", hidden: true},
     h("div", {class: "sep"}, "Use"),
     st.practice && s.service === "active" ? item("stand", "Hold STAND", "a limp robot stands up (practice)", "What holding the STAND button on the robot's chest for 2 s does.", () => act({action: "practice_stand", robot: name})) : null,
-    item("gamepad", "Drive with gamepad", "which buttons do what", "Shows how to drive the robot with its gamepad; the LED stays live.", () => gamepadDialog(name)),
+    item("gamepad", "Drive", "keyboard or gamepad", "Drive the robot with W A S D, Q E and a speed slider (robots deployed with the laptop guard), or see the gamepad buttons; the LED stays live.", () => driveDialog(name)),
     st.testgc && player ? item("flag", penalized ? "Unpenalize" : "Penalize", "test GameController: " + (penalized ? "back into play" : "take out of play"), "Test GameController: penalize / unpenalize player " + player, () => act({action: "gc_penalize", player, on: !penalized})) : null,
     h("div", {class: "sep"}, "Keep what is on it"),
     item("save", "Back up", "save the robot's software, on the robot", "bh robot backup: copies software, configuration and service files into a backup on the robot. It keeps running.", () => backupDialog(name)),
@@ -866,22 +875,96 @@ async function restoreDialog(name) {
     gateNodes, limpL),
     guarded("Restore", "primary", [gate, limp], () => { const b = radios.find(r => r.checked); closeModal(); act({action: "restore", robot: name, backup: b ? b.value : "", ignore_claim: !!(gate && gate.checked)}); }));
 }
-function gamepadDialog(name) {
-  const s = robot(name), fig = robotFigure(), cap = h("div", {class: "ledcap"});
-  renderLED(fig, cap, s);
+// Keyboard driving: the page repeats the current keys ten times per second (POST drive); bh dash forwards them
+// to the robot's RemoteDriveProvider (only on robots deployed with the laptop guard). The robot stops driving
+// 0.5 s after the last command, so closing the dialog, switching windows or losing the page all stop it.
+const DRIVE_KEYS = {q: ["rotation", 1], w: ["forward", 1], e: ["rotation", -1], a: ["sideways", 1], s: ["forward", -1], d: ["sideways", -1]};
+async function driveSend(body) {
+  try {
+    const r = await fetch("/api/action", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(Object.assign({token, action: "drive"}, body))});
+    const j = await r.json();
+    return j.error || null;
+  } catch (e) { return "dashboard not reachable - is bh dash still running?"; }
+}
+function driveDialog(name) {
+  const fig = robotFigure(), cap = h("div", {class: "ledcap"});
   const k = t => h("span", {class: "key"}, t);
-  const live = setInterval(() => renderLED(fig, cap, robot(name)), 1000);
-  const body = h("div", {style: "display:grid;grid-template-columns:1fr 120px;gap:12px"},
+  const held = new Set();
+  const pads = {};
+  const pad = (key, label) => (pads[key] = h("div", {class: "dk"}, h("b", {}, key.toUpperCase()), h("span", {}, label)));
+  const speed = h("input", {type: "range", min: "10", max: "100", step: "5", value: localStorage.getItem("bhdash.drive.speed") || "30", "aria-label": "Speed in percent of the robot's maximum"});
+  const speedOut = h("b", {}, speed.value + " %");
+  speed.oninput = () => { speedOut.textContent = speed.value + " %"; localStorage.setItem("bhdash.drive.speed", speed.value); };
+  const status = h("div", {});
+  const out = h("div", {class: "muted small", "aria-live": "polite"});
+  let lastError = "";
+  const update = () => {
+    const s = robot(name);
+    renderLED(fig, cap, s);
+    status.textContent = "";
+    if (!s.guard)
+      status.append(note("warn", "Not deployed with the laptop guard, so it cannot be driven from here. Deploy with \"Arm the laptop guard\" - only such a robot listens to this page."));
+    else if (!(s.heartbeat && s.heartbeat.released))
+      status.append(note("info", "The robot stands still until you press ", h("b", {}, "RUN"), " on the card's Guard row. STOP there stops it at any time."));
+  };
+  const command = () => {
+    const f = parseInt(speed.value, 10) / 100, c = {forward: 0, sideways: 0, rotation: 0};
+    for (const key of held) { const [axis, sign] = DRIVE_KEYS[key]; c[axis] += sign * f; }
+    for (const key of Object.keys(pads)) pads[key].classList.toggle("on", held.has(key));
+    return c;
+  };
+  const tick = async () => {
+    if (!robot(name).guard) return;
+    const c = command();
+    const err = await driveSend(Object.assign({robot: name, on: true}, c));
+    out.textContent = err ? err : held.size ? "driving: forward " + c.forward.toFixed(2) + ", sideways " + c.sideways.toFixed(2) + ", turn " + c.rotation.toFixed(2) : "standing - hold keys to walk";
+    if (err && err !== lastError) toast(err);
+    lastError = err || "";
+  };
+  const down = e => {
+    const key = e.key.toLowerCase();
+    if (!(key in DRIVE_KEYS) || e.ctrlKey || e.metaKey || e.altKey) return;
+    e.preventDefault();
+    if (!held.has(key)) { held.add(key); command(); tick(); }
+  };
+  const up = e => { const key = e.key.toLowerCase(); if (held.delete(key)) { command(); tick(); } };
+  const blur = () => { held.clear(); command(); };
+  document.addEventListener("keydown", down, true);
+  document.addEventListener("keyup", up, true);
+  window.addEventListener("blur", blur);
+  const keyboard = h("section", {class: "drive"},
+    h("div", {class: "drivepad", role: "img", "aria-label": "W forward, S back, A left, D right, Q turn left, E turn right"},
+      pad("q", "turn ⟲"), pad("w", "forward"), pad("e", "turn ⟳"), pad("a", "left"), pad("s", "back"), pad("d", "right")),
+    h("div", {class: "drivecfg"},
+      h("label", {class: "drivespeed"}, h("span", {}, "Speed ", speedOut, h("span", {class: "muted small"}, " of the robot's maximum")), speed),
+      h("p", {class: "small"}, "Hold keys to walk, release all to stand. Works while this dialog is open and this window has the focus; closing it, switching windows or a lost connection stops the robot within 0.5 s."),
+      out));
+  const gamepad = h("details", {},
+    h("summary", {}, "With the gamepad instead"),
     h("ol", {},
-      h("li", {}, "Robot software running, robot standing: hold ", k("STAND"), " on the robot for 2 s. Its LED should be white (initial) - then it does nothing on its own."),
-      h("li", {}, "The gamepad talks to the robot directly (its receiver is on the robot), not to this computer."),
+      h("li", {}, "The gamepad talks to the robot directly (its receiver is on the robot), not to this computer. It does not need the laptop guard."),
       h("li", {}, "Hold ", k("LT"), " and press ", k("+"), ". The robot says \"Remote control activated\" and its LED blinks slowly."),
       h("li", {}, k("left stick"), " walk forward / sideways, ", k("right stick ←→"), " turn, ", k("D-pad ↑"), " stand still, ", k("LB"), " kick, ", k("D-pad ←/→"), " wave."),
-      h("li", {}, "Done: hold ", k("LT"), " and press ", k("−"), ". The robot says \"Remote control deactivated\"."),
-      h("li", {class: "muted"}, "Emergency: Stop on the card or STOP ALL makes the robot limp at once.")),
-    h("div", {class: "figure"}, fig, cap));
-  modal("Drive " + name + " with the gamepad", body, []);
-  const obs = new MutationObserver(() => { if (!$("modal").classList.contains("open")) { clearInterval(live); obs.disconnect(); } });
+      h("li", {}, "Done: hold ", k("LT"), " and press ", k("−"), ". The robot says \"Remote control deactivated\".")));
+  const body = h("div", {},
+    h("div", {style: "display:grid;grid-template-columns:1fr 120px;gap:12px"},
+      h("div", {},
+        h("p", {}, "Robot standing and active: hold ", k("STAND"), " on the robot for 2 s, then ", k("WALK"), " for 2 s. Opening this dialog puts it under remote control (it says \"Remote drive\", its LED blinks slowly) - it then only does what the keys say."),
+        status, keyboard),
+      h("div", {class: "figure"}, fig, cap)),
+    gamepad,
+    h("p", {class: "muted small"}, "Emergency: STOP on the Guard row stops it standing; Stop on the card or STOP ALL makes it limp at once."));
+  modal("Drive " + name, body, []);
+  update();
+  const live = setInterval(update, 1000), loop = setInterval(tick, 100);
+  const obs = new MutationObserver(() => {
+    if ($("modal").classList.contains("open")) return;
+    clearInterval(live); clearInterval(loop); obs.disconnect();
+    document.removeEventListener("keydown", down, true);
+    document.removeEventListener("keyup", up, true);
+    window.removeEventListener("blur", blur);
+    driveSend({robot: name, on: false});
+  });
   obs.observe($("modal"), {attributes: true});
 }
 
@@ -1067,7 +1150,7 @@ function renderHelp(st) {
       how("…use a robot that others use too?", "Everybody runs their own bh dash. Press Claim in the bar under the robot's name and add a note: the claim is kept on the robot, so every teammate's page shows your name, and their Deploy, Policies and Restore make them confirm that they asked you. Back up before you deploy (Deploy has the checkbox). When you are done: More → Restore, start the robot, and Release it. A claim ends by itself; Stop always works for everybody."),
       how("…know who uses which robot?", "The bar under each robot's name: Free (grey), Yours (blue) or 'NAME is using it' (amber), with their note. Click 'you are NAME' at the top to see the three sharing steps again."),
       how("…add a new kind of policy (a new slot)?", "Policies tab → New slot explains it: it needs C++ code, configuration and one line in Util/bh/bhtool/policy.py; then the slot appears here and in every bh policy command."),
-      how("…drive a robot myself?", "Card → More → Drive with gamepad shows the buttons. The LED blinks slowly while the gamepad is in control."),
+      how("…drive a robot myself?", "Card → More → Drive: W/S forward and back, A/D sideways, Q/E turn, with a speed slider - for a robot deployed with the laptop guard, after RUN. The same dialog shows the gamepad buttons. The LED blinks slowly while it is remote controlled."),
       how("…stop a robot?", "Hard: the red-outlined Stop at the top of its card, STOP ALL at the top of the page, or the robot's red button - the robot goes limp at once, so hold it. Neither asks first. Soft: with the laptop guard armed (Deploy → 'Arm the laptop guard') STOP in the Guard row of its card makes it stand still."),
       how("…find out why a robot does not work?", "More → Check robot (read-only) answers 'will it run?' and names what is wrong. More → Log shows the last 400 lines the software wrote, Crash report the report of the last crash."),
       how("…do the same from the command line?", h("p", {}, "Every button runs the same code as a bh command, shown at the top of its output in Activity. bh --help lists them."))),

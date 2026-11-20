@@ -48,6 +48,7 @@
 #include "Representations/Infrastructure/JoystickState.h"
 #include "Representations/Infrastructure/RobotHealth.h"
 #include "Representations/Infrastructure/EmergencyButtonState.h"
+#include "Representations/Infrastructure/RemoteDriveRequest.h"
 #include "Representations/Infrastructure/SensorData/KeyStates.h"
 #include "Representations/Infrastructure/SensorData/SystemSensorData.h"
 #include "Representations/Modeling/BallLostModel.h"
@@ -98,6 +99,7 @@ MODULE(SkillBehaviorControl,
   REQUIRES(ClearTarget),
   REQUIRES(DribbleTarget),
   REQUIRES(EmergencyButtonState),
+  REQUIRES(RemoteDriveRequest),
   REQUIRES(EnhancedKeyStates),
   REQUIRES(ExpectedGoals),
   REQUIRES(ExtendedGameState),

@@ -43,7 +43,9 @@ earlier.
 
 Then, on the field:
 
-1. Hold **STAND for 2 seconds** on each robot. It stands up.
+1. On each robot: hold **STAND for 2 seconds** (LED magenta, "Prepare"), then hold **WALK for 2 seconds**
+   while it stands upright and still ("Walk"). It is now active
+   ([testing-and-safety.md](testing-and-safety.md#deploy)).
 2. Look at the backs: **white steady** = the robot hears the GameController. **White blinking** = it does
    not - run `bh gc doctor` now, not after kick-off.
 3. From here on the GameController decides. The robots walk to their positions in *ready* by themselves.
@@ -55,7 +57,7 @@ Then, on the field:
 | Situation | Do |
 |---|---|
 | referee asks to remove a robot | press F1 (limp), carry it out |
-| robot back in | hold STAND for 2 s; the GameController handles the penalty |
+| robot back in | if F1 was pressed: hold F1 for 2 s first ("Body ready"); then STAND 2 s, WALK 2 s; the GameController handles the penalty |
 | robot does not react any more | take it out; `bh status NAME` and `bh restart NAME` at the touchline, or switch it off and on |
 | half time | `bh status` - batteries and temperatures; swap every battery it warns about |
 

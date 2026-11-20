@@ -27,10 +27,18 @@
 Useful options: `--team`, `--scenario`, `--location`, `--profile` (wireless profile from `Install/Profiles`),
 `--volume`, `--color`, `--goalie-color`, `--magic`, `--delete-logs`, `--dry-run` (all checks, nothing copied).
 
-After the start the robot is limp (back LED blinks blue). Hold **STAND for 2 seconds** and it stands up and
-waits (LED white). Without a GameController, each short press of STAND or WALK then switches between
-*penalized* (LED red, stands still - this is what the first press gives) and *playing* (LED green).
-**F1 makes it limp again at any time.**
+After the start the robot is limp (back LED blinks blue). To stand it up (K1):
+
+1. Set it on its feet and hold it.
+2. Hold **STAND for 2 seconds**: it stiffens and holds a ready pose (LED magenta, it says "Prepare").
+3. Hold **WALK for 2 seconds** while it is upright and still: it says "Walk" and is active. If the LED
+   blinks fast instead, it is tilted or moving - steady it and hold WALK again.
+
+Without a GameController it is now *penalized* (LED red, stands still); each short press of STAND or WALK
+switches between *playing* (LED green) and *penalized*.
+
+**F1 makes it limp again at any time.** After F1 the robot ignores STAND and WALK until you hold **F1 for about
+2 seconds** - it says "Body ready" - then stand it up as above.
 
 ## Layers of control
 
@@ -70,7 +78,9 @@ falling or getting up at that moment relaxes on the ground and stays down until 
 
 How it works: a robot deployed with `--guard` gets a robot-side thread configuration
 (`Config/Robots/<name>/threads.cfg` on the robot only) that enables the existing `EmergencyButtonProvider`.
-It listens on UDP port 9910. Nothing in the repository changes, and **the next deploy without `--guard`
+It listens on UDP port 9910. The same file enables `RemoteDriveProvider` (UDP 9911), with which the
+dashboard's **Drive** dialog walks the robot by keyboard ([dashboard.md](dashboard.md)) - only while the
+guard says RUN. Nothing in the repository changes, and **the next deploy without `--guard`
 removes it** - so match deployments are never guarded (`bh match` also makes sure of that).
 `bh status` and the dashboard show "laptop guard is armed" for such a robot.
 

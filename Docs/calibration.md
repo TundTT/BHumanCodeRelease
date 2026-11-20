@@ -39,7 +39,7 @@ deliberately sends the repository's version instead.
 Needed for every new robot, after a fall that bent the head, and after any work on the head.
 
 1. Put the robot on the field so that it sees the lines of a goal area, deploy, and let it stand
-   (hold STAND for 2 s).
+   (hold STAND for 2 s, then WALK for 2 s).
 2. Attach mission control and start the calibration script in the SimRobot console:
 
    ```bash

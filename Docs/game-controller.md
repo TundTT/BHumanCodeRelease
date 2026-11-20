@@ -36,7 +36,7 @@ prints the game state whenever it changes (state, half, time, score, set plays, 
 | doctor: robot "is deployed with team number N" | the robot was deployed for another team number | deploy again |
 | two robots with the same player number | deployed without `name:number` | `bh deploy Alice:1 Bob:2` |
 | robot reacts late or not at all, doctor is fine on the laptop | the robot is in another network than the laptop (cable vs. wireless) | check the profile: `bh deploy ... --profile NAME`, then `bh status` |
-| robot does not react to anything | it is limp (blue blinking) or in calibration mode (orange) - it ignores the GameController then | hold STAND for 2 s |
+| robot does not react to anything | it is limp (blue blinking) or in calibration mode (orange) - it ignores the GameController then | hold STAND for 2 s, then WALK for 2 s; after F1 first hold F1 for 2 s ("Body ready") |
 
 Without a GameController the robot follows its buttons. As soon as it hears one, the GameController is in
 charge; when the packets stop, the robot falls back to its buttons after 5 seconds.
