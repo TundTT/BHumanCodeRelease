@@ -435,7 +435,9 @@ class Dashboard:
             if robot:
                 self.target(robot)
                 g = self.robot_guard(robot, create=flag("released"))
-                if g is None:
+                if g is None and self.guard and not flag("released"):
+                    g = self.guard                       # STOP from a card with only --guard running: stop all
+                elif g is None:
                     return "no heartbeat for %s" % robot, None
             elif self.guard:
                 g = self.guard

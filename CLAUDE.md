@@ -225,6 +225,9 @@ Rules:
   parameters were tuned around this is unknown. Test before changing: swapping the two offset values for
   one team with `bh eval --variant WalkingEngine=...` shows the effect of the "corrected" pairing without
   touching code.
+- Driving with forward and turn at the same time (dashboard Drive, W+E at 30 %) only turned on the K1 (lab,
+  2026-11-21). The page sends both; the walk shortens forward steps while turning (`getStepSizeFactor`, see
+  the finding above). Not measured; check in the simulator before touching the walk.
 - `Config/Scenes/Includes/AutomaticCameraCalibration.con` refers to a behaviour option that does not exist
   in this release; the calibration behaviour always runs the manual procedure.
 

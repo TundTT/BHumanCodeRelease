@@ -892,9 +892,14 @@ function driveDialog(name) {
   const held = new Set();
   const pads = {};
   const pad = (key, label) => (pads[key] = h("div", {class: "dk"}, h("b", {}, key.toUpperCase()), h("span", {}, label)));
-  const speed = h("input", {type: "range", min: "10", max: "100", step: "5", value: localStorage.getItem("bhdash.drive.speed") || "30", "aria-label": "Speed in percent of the robot's maximum"});
-  const speedOut = h("b", {}, speed.value + " %");
-  speed.oninput = () => { speedOut.textContent = speed.value + " %"; localStorage.setItem("bhdash.drive.speed", speed.value); };
+  const slider = (key, label, aria) => {
+    const input = h("input", {type: "range", min: "10", max: "100", step: "5", value: localStorage.getItem(key) || "30", "aria-label": aria});
+    const out = h("b", {}, input.value + " %");
+    input.oninput = () => { out.textContent = input.value + " %"; localStorage.setItem(key, input.value); };
+    return [input, h("label", {class: "drivespeed"}, h("span", {}, label + " ", out), input)];
+  };
+  const [speed, speedRow] = slider("bhdash.drive.speed", "Walk speed (W A S D)", "Walk speed in percent of the robot's maximum");
+  const [turn, turnRow] = slider("bhdash.drive.turn", "Turn speed (Q E)", "Turn speed in percent of the robot's maximum");
   const status = h("div", {});
   const out = h("div", {class: "muted small", "aria-live": "polite"});
   let lastError = "";
@@ -908,8 +913,8 @@ function driveDialog(name) {
       status.append(note("info", "The robot stands still until you press ", h("b", {}, "RUN"), " on the card's Guard row. STOP there stops it at any time."));
   };
   const command = () => {
-    const f = parseInt(speed.value, 10) / 100, c = {forward: 0, sideways: 0, rotation: 0};
-    for (const key of held) { const [axis, sign] = DRIVE_KEYS[key]; c[axis] += sign * f; }
+    const walk = parseInt(speed.value, 10) / 100, yaw = parseInt(turn.value, 10) / 100, c = {forward: 0, sideways: 0, rotation: 0};
+    for (const key of held) { const [axis, sign] = DRIVE_KEYS[key]; c[axis] += sign * (axis === "rotation" ? yaw : walk); }
     for (const key of Object.keys(pads)) pads[key].classList.toggle("on", held.has(key));
     return c;
   };
@@ -923,6 +928,12 @@ function driveDialog(name) {
   };
   const down = e => {
     const key = e.key.toLowerCase();
+    if (key === " " && !e.ctrlKey && !e.metaKey && !e.altKey) {          // space: guard STOP, the robot freezes
+      e.preventDefault(); e.stopPropagation();
+      held.clear(); command();
+      if (!e.repeat) act({action: "guard", robot: name, released: false});
+      return;
+    }
     if (!(key in DRIVE_KEYS) || e.ctrlKey || e.metaKey || e.altKey) return;
     e.preventDefault();
     if (!held.has(key)) { held.add(key); command(); tick(); }
@@ -936,8 +947,9 @@ function driveDialog(name) {
     h("div", {class: "drivepad", role: "img", "aria-label": "W forward, S back, A left, D right, Q turn left, E turn right"},
       pad("q", "turn ⟲"), pad("w", "forward"), pad("e", "turn ⟳"), pad("a", "left"), pad("s", "back"), pad("d", "right")),
     h("div", {class: "drivecfg"},
-      h("label", {class: "drivespeed"}, h("span", {}, "Speed ", speedOut, h("span", {class: "muted small"}, " of the robot's maximum")), speed),
-      h("p", {class: "small"}, "Hold keys to walk, release all to stand. Works while this dialog is open and this window has the focus; closing it, switching windows or a lost connection stops the robot within 0.5 s."),
+      speedRow, turnRow,
+      h("p", {class: "muted small"}, "In percent of the robot's maximum. While it turns, the walk takes shorter steps forward."),
+      h("p", {class: "small"}, "Hold keys to walk, release all to stand. ", k("Space"), " = guard STOP: the robot freezes until you press RUN on the card again. Works while this dialog is open and this window has the focus; closing it, switching windows or a lost connection stops the robot within 0.5 s."),
       out));
   const gamepad = h("details", {},
     h("summary", {}, "With the gamepad instead"),

@@ -101,8 +101,10 @@ Hovering any button shows the matching `bh` command and what it does.
 1. Stand the robot up (F1 2 s, then STAND 2 s, then WALK 2 s) and press **RUN** on its Guard row.
 2. Open Drive. The robot says "Remote drive", its LED blinks slowly, and it stands until you press keys.
 3. Hold **W** / **S** to walk forward / back, **A** / **D** to walk left / right, **Q** / **E** to turn left /
-   right; keys combine. The slider sets the speed in percent of the robot's maximum (default 30 %, remembered).
-   Release all keys and it stands.
+   right; keys combine. Two sliders set the walk speed (W A S D) and the turn speed (Q E) in percent of the
+   robot's maximum (default 30 % each, remembered). While it turns, the walk takes shorter steps forward, so a
+   fast turn with a slow walk mostly turns. Release all keys and it stands.
+   **Space** sets the robot's guard to STOP: it freezes and stays frozen until RUN on its card.
 4. Close the dialog: it says "Remote drive off" and goes back to what it did before - a robot that was
    *playing* plays (moves) again, so press a short STAND first if it should stay put (penalized).
 
