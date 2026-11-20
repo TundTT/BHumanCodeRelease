@@ -197,9 +197,25 @@ class Dashboard:
                 g.set_released(False)
                 self.log("guard: browser stopped responding -> STOP")
 
+    def find_unreachable(self) -> None:
+        """The address of each robot is chosen once, when the page starts (cable if it answers, else wireless).
+        A robot that was rebooting then, or that was plugged in or out since, would stay "offline" for good:
+        so an unreachable robot gets its other address tried at every poll."""
+        for i, t in enumerate(list(self.targets)):
+            with self.lock:
+                reachable = (self.status.get(self.name(t)) or {}).get("reachable")
+            if t.robot is None or reachable is not False:
+                continue
+            for ip in (t.robot.lan, t.robot.wlan):
+                if ip and ip != t.ip and core.tcp_open(ip):
+                    self.targets[i] = Target(ip, t.robot)
+                    self.log("%s answers at %s now" % (t.robot.name, ip))
+                    break
+
     def poll_loop(self) -> None:
         while self.running:
             if not self.passive:
+                self.find_unreachable()
                 for s in remote.collect_all(self.targets):
                     with self.lock:
                         self.status[s["name"]] = s

@@ -400,6 +400,28 @@ class Sharing(unittest.TestCase):
             self.assertIsNone(dash.UPLOAD_NAME.match(bad), bad)
 
 
+class DashAddresses(unittest.TestCase):
+    def test_an_unreachable_robot_gets_its_other_address_tried(self):
+        import threading
+        from bhtool import dash
+        robot = core.Robot("robot", "192.168.100.5", "10.0.100.5", "k1")
+        d = dash.Dashboard.__new__(dash.Dashboard)
+        d.targets = [core.Target(robot.lan, robot)]        # chosen while the robot was rebooting
+        d.status = {"robot": {"name": "robot", "reachable": False}}
+        d.lock, d.messages = threading.Lock(), []
+        saved = core.tcp_open
+        core.tcp_open = lambda ip, port=22, timeout=0.8: ip == robot.wlan
+        try:
+            d.find_unreachable()
+            self.assertEqual(d.targets[0].ip, robot.wlan)
+            d.status["robot"]["reachable"] = True              # a reachable robot is left alone
+            core.tcp_open = lambda ip, port=22, timeout=0.8: True
+            d.find_unreachable()
+            self.assertEqual(d.targets[0].ip, robot.wlan)
+        finally:
+            core.tcp_open = saved
+
+
 class SshFailures(unittest.TestCase):
     def test_only_a_refused_login_is_blamed_on_the_key(self):
         from types import SimpleNamespace
